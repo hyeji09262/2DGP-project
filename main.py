@@ -1,5 +1,5 @@
 from pico2d import *
-from player import Player
+from boy import Boy
 from field import Field
 
 
@@ -16,20 +16,20 @@ def handle_events():
         elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
             running = False
         else:
-            player.handle_event(event)
+            boy.handle_event(event)
 
 
 def reset_world():
     global world
-    global player
+    global boy
 
     world = []
 
     field = Field()
     world.append(field)
 
-    player = Player()
-    world.append(player)
+    boy = Boy()
+    world.append(boy)
 
 
 
