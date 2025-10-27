@@ -9,8 +9,8 @@ class Field:
 
     def draw(self):
         if self.image:
-            self.image.draw(400, 300)
-        else
+            self.image.draw(500, 290)
+        else:
             draw_line(0, 30, 800, 30)
 
     def update(self):
