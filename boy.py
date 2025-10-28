@@ -57,7 +57,7 @@ class Idle:
         if self.boy.face_dir == 1:  # right
             self.boy.image.clip_draw(self.boy.frame * 180, 920, 180, 230, self.boy.x, self.boy.y)
         else:  # face_dir == -1: # left
-            self.boy.image.clip_draw(self.boy.frame * 170, 920, 170, 230, self.boy.x, self.boy.y)
+            self.boy.image.clip_composite_draw(self.boy.frame * 180, 920, 180, 230, 0, 'h', self.boy.x, self.boy.y, 180, 230)
 
 
 class Boy:
