@@ -28,7 +28,7 @@ class Run:
         pass
 
     def do(self):
-        self.boy.frame = (self.boy.frame + 1) % 8
+        self.boy.frame = (self.boy.frame + 1) % 3
         self.boy.x += self.boy.dir * 5
 
     def draw(self):
@@ -51,18 +51,18 @@ class Idle:
         pass
 
     def do(self):
-        self.boy.frame = (self.boy.frame + 1) % 8
+        self.boy.frame = (self.boy.frame + 1) %1
 
     def draw(self):
-        if self.boy.face_dir == 1: # right
-            self.boy.image.clip_draw(self.boy.frame * 100, 300, 100, 100, self.boy.x, self.boy.y)
-        else: # face_dir == -1: # left
-            self.boy.image.clip_draw(self.boy.frame * 100, 200, 100, 100, self.boy.x, self.boy.y)
+        if self.boy.face_dir == 1:  # right
+            self.boy.image.clip_draw(self.boy.frame * 180, 920, 180, 230, self.boy.x, self.boy.y)
+        else:  # face_dir == -1: # left
+            self.boy.image.clip_draw(self.boy.frame * 170, 920, 170, 230, self.boy.x, self.boy.y)
 
 
 class Boy:
     def __init__(self):
-        self.x, self.y = 400, 90
+        self.x, self.y = 500, 100
         self.frame = 0
         self.face_dir = 1
         self.dir = 0
