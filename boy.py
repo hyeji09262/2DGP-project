@@ -1,7 +1,15 @@
-from pico2d import load_image, get_time
+from pico2d import load_image, get_time, load_font
 from sdl2 import SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP, SDLK_LEFT
 
+import game_framework
 from state_machine import StateMachine
+
+
+PIXEL_PER_METER = (10.0 / 0.3) # 10 pixel 30 cm
+RUN_SPEED_KMPH = 20.0 # Km / Hour
+RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
+RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
+RUN_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
 
 
 def right_down(e):
@@ -28,15 +36,27 @@ class Run:
         pass
 
     def do(self):
-        self.boy.frame = (self.boy.frame + 1) % 3
-        self.boy.x += self.boy.dir * 5
+        self.boy.frame = (self.boy.frame + 1) % 4
+        self.boy.x += self.boy.dir * RUN_SPEED_PPS * game_framework.frame_time
 
     def draw(self):
-        if self.boy.face_dir == 1: # right
-            self.boy.image.clip_draw(self.boy.frame * 100, 100, 100, 100, self.boy.x, self.boy.y)
-        else: # face_dir == -1: # left
-            self.boy.image.clip_draw(self.boy.frame * 100, 0, 100, 100, self.boy.x, self.boy.y)
+        W, H = 100, 180  # 프레임 가로/세로
+        PITCH = 100  # 다음 프레임까지 이동량(여백 없으면 W와 같게)
+        START_X = 230 # 첫 프레임의 left
+        START_Y= 1075  # 줄의 bottom(y)
 
+        left = START_X + (self.boy.frame % 4) * PITCH
+        bottom = START_Y
+
+        if self.boy.face_dir == -1:
+            self.boy.image.clip_draw(left, bottom, W, H, self.boy.x, self.boy.y)
+        else:
+            self.boy.image.clip_composite_draw(
+                left, bottom, W, H,
+                0, 'h',  # 회전 0, flip='h'
+                self.boy.x, self.boy.y,
+                W, H  # 출력 크기도 W,H로 통일(깜빡임 방지)
+            )
 
 class Idle:
 
@@ -51,24 +71,39 @@ class Idle:
         pass
 
     def do(self):
-        self.boy.frame = (self.boy.frame + 1) %1
+        self.boy.frame = (self.boy.frame + 1) % 2
+
 
     def draw(self):
-        if self.boy.face_dir == -1:  # right
-            self.boy.image.clip_draw(self.boy.frame * 180, 920, 180, 230, self.boy.x, self.boy.y)
-        else:  # face_dir == -1: # left
-            self.boy.image.clip_composite_draw(self.boy.frame * 180, 920, 180, 230, 0, 'h', self.boy.x, self.boy.y, 180, 230)
+        W, H = 100, 200
+        PITCH = 100 # 프레임 간 간격 (칸폭+여백)
+        START_X = 220
+        START_Y = 1270  # 그 줄의 bottom
 
+        left = START_X + (self.boy.frame % 2) * PITCH
+        bottom = START_Y
+
+        if self.boy.face_dir == -1:
+            self.boy.image.clip_draw(left, bottom, W, H, self.boy.x, self.boy.y)
+        else:
+            self.boy.image.clip_composite_draw(
+                left, bottom, W, H,
+                0, 'h',  # 회전 0, 가로 반전
+                self.boy.x, self.boy.y,
+                W, H  # 양쪽 크기 동일 (깜빡임/튀는 느낌 방지)
+            )
 
 class Boy:
     def __init__(self):
-        self.x, self.y = 500, 100
+        self.font = load_font('ENCR10B.TTF', 16)
+
+        self.x, self.y = 500, 200
         self.frame = 0
         self.face_dir = 1
         self.dir = 0
         self.velocity = 0
         self.size = 1.0
-        self.image = load_image('사진수집/character/캐릭터1.png')
+        self.image = load_image('사진수집/character/캐릭터2.png')
 
         self.IDLE = Idle(self)
         self.Run = Run(self)
@@ -83,6 +118,10 @@ class Boy:
 
     def update(self):
         self.state_machine.update()
+
+    def handle_event(self, event):
+        self.state_machine.handle_state_event(('INPUT', event))
+        pass
 
     def draw(self):
         self.state_machine.draw()
