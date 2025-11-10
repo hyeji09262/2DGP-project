@@ -3,11 +3,13 @@ import game_framework
 import play_mode
 
 image = None
+font = None
 
 def init(): # 타이틀 이미지를 로드
-    global image, logo_start_time
+    global image, logo_start_time, font
 
     image = load_image('사진수집/메인 화면.jpg')
+    font = load_font('ENCR10B.TTF', 30)
 
 def update(): #시간 체크
     pass
@@ -15,11 +17,14 @@ def update(): #시간 체크
 def draw():#로고 이미지를 그림
     clear_canvas()
     image.draw(500,275)
+    font.draw(300, 150, 'Press SPACE to Start', (255, 255, 255))
+
     update_canvas()
 
 def finish():
-    global image
+    global image, font
     del image
+    del font
 
 def handle_events():
     event_list = get_events() #현재까지 들어온 이벤트들을 받아온다
