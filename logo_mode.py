@@ -1,3 +1,4 @@
+import game_framework
 from pico2d import*
 
 image = None
@@ -17,6 +18,7 @@ def update():
      if get_time() - logo_start_time >= 2.0:
          logo_start_time = get_time()
          running = False
+         game_framework.quit()
 def draw():
      clear_canvas()
      image.draw(500, 275)
