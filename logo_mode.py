@@ -19,7 +19,7 @@ def update():
     global logo_start_time
     if get_time() - logo_start_time >= 2.0:
         logo_start_time = get_time()
-    game_framework.change_mode(title_mode)
+        game_framework.change_mode(title_mode)
 def draw():
      clear_canvas()
      image.draw(500, 275)

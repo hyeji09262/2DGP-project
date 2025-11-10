@@ -1,4 +1,7 @@
 import time
+
+import game_world
+
 frame_time = 0.0
 
 running = None
@@ -64,3 +67,7 @@ def run(start_mode):
     while (len(stack) > 0):
         stack[-1].finish()
         stack.pop()
+
+def clear():
+    for layer in game_world.objects:
+        layer.clear()
