@@ -19,7 +19,7 @@ def update():
          running = False
 def draw():
      clear_canvas()
-     image.draw(400, 300)
+     image.draw(500, 275)
      update_canvas()
 def handle_events():
  # 현재 이벤트들을 소비
