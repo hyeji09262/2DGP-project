@@ -1,24 +1,38 @@
 from pico2d import *
 import game_framework
+import play_mode
 
 image = None
 
-def init():
-     global image
-     image = load_image('사진수집/메인 화면.jpg')
+def init(): # 타이틀 이미지를 로드
+    global image, logo_start_time
+
+    image = load_image('사진수집/메인 화면.jpg')
+
+def update(): #시간 체크
+    pass
+
+def draw():#로고 이미지를 그림
+    clear_canvas()
+    image.draw(500,275)
+    update_canvas()
+
 def finish():
-     global image
-     del image
+    global image
+    del image
+
 def handle_events():
-     event_list = get_events()
-     for event in event_list:
-         if event.type == SDL_QUIT:
-             game_framework.quit()
-         elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-             game_framework.quit()
-def draw():
-     clear_canvas()
-     image.draw(400,300)
-def update(): pass
-def pause(): pass
-def resume(): pass
+    event_list = get_events() #현재까지 들어온 이벤트들을 받아온다
+    # 그리고 아무처리도 하지 않는다
+    for event in event_list:
+        if event.type == SDL_QUIT:
+            game_framework.quit()
+        elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
+            game_framework.quit()
+        elif event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
+            game_framework.change_mode(play_mode)
+
+def pause():
+    pass
+def resume():
+    pass
