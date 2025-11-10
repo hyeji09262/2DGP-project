@@ -42,6 +42,7 @@ def draw():
 
 def finish():
     game_world.clear()
+    pass
 
 def pause(): pass
 def resume(): pass
