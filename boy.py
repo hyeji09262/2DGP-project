@@ -97,7 +97,7 @@ class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
 
-        self.x, self.y = 500, 200
+        self.x, self.y = 500, 305
         self.frame = 0
         self.face_dir = 1
         self.dir = 0

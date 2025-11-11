@@ -31,6 +31,7 @@ def init():
     boy = Boy()
     game_world.add_object(boy, 1)
 
+
     field.target = boy
 
    
