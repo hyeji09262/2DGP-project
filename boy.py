@@ -40,8 +40,8 @@ class Run:
 
     def draw(self):
         W, H = 100, 160  # 프레임 가로/세로
-        PITCH = 100  # 다음 프레임까지 이동량(여백 없으면 W와 같게)
-        START_X = 230 # 첫 프레임의 left
+        PITCH = 105  # 다음 프레임까지 이동량(여백 없으면 W와 같게)
+        START_X = 225 # 첫 프레임의 left
         START_Y= 1075 # 줄의 bottom(y)
 
         left = START_X + (self.boy.frame % 4) * PITCH
@@ -74,7 +74,7 @@ class Idle:
 
     def draw(self):
         W, H = 100, 180
-        PITCH = 100 # 프레임 간 간격 (칸폭+여백)
+        PITCH = 105# 프레임 간 간격 (칸폭+여백)
         START_X = 220
         START_Y = 1260  # 그 줄의 bottom
 
@@ -94,7 +94,7 @@ class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
 
-        self.x, self.y = 500, 340
+        self.x, self.y = 2500, 340
         self.frame = 0
         self.face_dir = 1
         self.dir = 0
