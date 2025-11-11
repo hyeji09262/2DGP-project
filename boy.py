@@ -124,7 +124,7 @@ class Boy:
         self.foot_idle_adj = 52
         self.foot_run_adj = 47
 
-        self.x, self.y = 10, 340
+        self.x, self.y = 2500, 340
         self.frame = 0
         self.face_dir = 1
         self.dir = 0
