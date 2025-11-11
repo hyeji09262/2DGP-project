@@ -49,11 +49,17 @@ class Run:
 
         sx, sy = self.boy.screen_xy()
 
+        S = self.boy.scale
+        DW, DH = int(W * S), int(H * S)
+
+        foot_fix = (DH - H) // 2
+        y = sy - foot_fix  - self.boy.foot_run_adj
+
         if self.boy.face_dir == -1:  # 왼쪽 바라봄(반전 없음)
-            self.boy.image.clip_draw(left, bottom, W, H, sx, sy)
+            self.boy.image.clip_composite_draw(left, bottom, W, H,0,'', sx, y, DW,DH)
         else:  # 오른쪽(수평 반전)
             self.boy.image.clip_composite_draw(left, bottom, W, H,
-                                               0, 'h', sx, sy, W, H)
+                                               0, 'h', sx, y, DW,DH)
 
 
 class Idle:
@@ -87,7 +93,7 @@ class Idle:
 
     def draw(self):
         W, H = 100, 180
-        PITCH = 105# 프레임 간 간격 (칸폭+여백)
+        PITCH = 103# 프레임 간 간격 (칸폭+여백)
         START_X = 220
         START_Y = 1260  # 그 줄의 bottom
 
@@ -96,16 +102,27 @@ class Idle:
 
         sx, sy = self.boy.screen_xy()
 
+        S = self.boy.scale
+        DW, DH = int(W * S), int(H * S)
+
+        foot_fix = (DH - H) // 2
+        y = sy - foot_fix  - self.boy.foot_idle_adj
+
         if self.boy.face_dir == -1:  # 왼쪽
-            self.boy.image.clip_draw(left, bottom, W, H, sx, sy)
+            self.boy.image.clip_composite_draw(left, bottom, W, H,0,'', sx, y,DW,DH)
         else:  # 오른쪽(수평 반전)
             self.boy.image.clip_composite_draw(left, bottom, W, H,
-                                               0, 'h', sx, sy, W, H)
+                                               0, 'h', sx, y,DW,DH)
 
 
 class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
+
+        self.scale = 0.7
+
+        self.foot_idle_adj = 52
+        self.foot_run_adj = 47
 
         self.x, self.y = 2500, 340
         self.frame = 0
@@ -141,10 +158,7 @@ class Boy:
 
     def draw(self):
         self.state_machine.draw()
-        if self.camera:
-            sx, sy = self.camera.world_to_screen(self.x, self.y)
-        else:
-             sx, sy = self.x, self.y
+
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))

@@ -17,7 +17,7 @@ def update(): #시간 체크
 def draw():#로고 이미지를 그림
     clear_canvas()
     image.draw(500,275)
-    font.draw(300, 150, 'Press SPACE to Start', (255, 255, 255))
+    font.draw(300, 130, '< Press SPACE to Start >', (255, 255, 255))
 
     update_canvas()
 
