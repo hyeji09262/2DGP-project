@@ -1,5 +1,4 @@
-from pico2d import load_image, get_time, load_font
-from sdl2 import SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP, SDLK_LEFT
+from pico2d import load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP, SDLK_LEFT
 
 import game_framework
 from state_machine import StateMachine
@@ -48,15 +47,14 @@ class Run:
         left = START_X + (self.boy.frame % 4) * PITCH
         bottom = START_Y
 
-        if self.boy.face_dir == -1:
-            self.boy.image.clip_draw(left, bottom, W, H, self.boy.x, self.boy.y)
-        else:
-            self.boy.image.clip_composite_draw(
-                left, bottom, W, H,
-                0, 'h',  # 회전 0, flip='h'
-                self.boy.x, self.boy.y,
-                W, H  # 출력 크기도 W,H로 통일(깜빡임 방지)
-            )
+        sx, sy = self.boy.screen_xy()
+
+        if self.boy.face_dir == -1:  # 왼쪽 바라봄(반전 없음)
+            self.boy.image.clip_draw(left, bottom, W, H, sx, sy)
+        else:  # 오른쪽(수평 반전)
+            self.boy.image.clip_composite_draw(left, bottom, W, H,
+                                               0, 'h', sx, sy, W, H)
+
 
 class Idle:
 
@@ -83,15 +81,14 @@ class Idle:
         left = START_X + (self.boy.frame % 2) * PITCH
         bottom = START_Y
 
-        if self.boy.face_dir == -1:
-            self.boy.image.clip_draw(left, bottom, W, H, self.boy.x, self.boy.y)
-        else:
-            self.boy.image.clip_composite_draw(
-                left, bottom, W, H,
-                0, 'h',  # 회전 0, 가로 반전
-                self.boy.x, self.boy.y,
-                W, H  # 양쪽 크기 동일 (깜빡임/튀는 느낌 방지)
-            )
+        sx, sy = self.boy.screen_xy()
+
+        if self.boy.face_dir == -1:  # 왼쪽
+            self.boy.image.clip_draw(left, bottom, W, H, sx, sy)
+        else:  # 오른쪽(수평 반전)
+            self.boy.image.clip_composite_draw(left, bottom, W, H,
+                                               0, 'h', sx, sy, W, H)
+
 
 class Boy:
     def __init__(self):
@@ -104,6 +101,7 @@ class Boy:
         self.velocity = 0
         self.size = 1.0
         self.image = load_image('사진수집/character/캐릭터2.png')
+        self.camera = None
 
         self.IDLE = Idle(self)
         self.Run = Run(self)
@@ -115,17 +113,34 @@ class Boy:
             }
         )
 
+    def screen_xy(self):
+        if self.camera:
+            return self.camera.world_to_screen(self.x, self.y)
+        return self.x, self.y
+
 
     def update(self):
         self.state_machine.update()
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
-        pass
+
 
     def draw(self):
         self.state_machine.draw()
+        if self.camera:
+            sx, sy = self.camera.world_to_screen(self.x, self.y)
+        else:
+             sx, sy = self.x, self.y
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
         pass
+
+    def set_camera(self, cam):
+        self.camera = cam
+
+    def screen_xy(self):
+        if self.camera:
+            return self.camera.world_to_screen(self.x, self.y)
+        return self.x, self.y

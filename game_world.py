@@ -16,9 +16,10 @@ def remove_object(o):
 
 
 def update():
-    for layer in world:
-        for o in layer:
-            o.update()
+    for depth in range(len(world) - 1, -1, -1):
+        for o in world[depth]:
+            if hasattr(o, 'update'):
+                o.update()
 
 def render():
     for layer in world:

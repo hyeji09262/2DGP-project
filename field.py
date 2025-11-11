@@ -4,7 +4,7 @@ class Field:
     VIEW_W = 1000
     VIEW_H = 550
 
-    def __init__(self, image_path='사진수집/background/헤네시스.png', lerp=0.15,
+    def __init__(self, image_path='사진수집/background/헤네시스.png', lerp=0.1,
             start_x = None, start_y = None, draw_offset_x = 0, draw_offset_y = 0):
         try:
             self.image = load_image(image_path)
@@ -65,7 +65,10 @@ class Field:
         desired_cx = max(min_cx, min(tx, max_cx))
         desired_cy = max(min_cy, min(ty, max_cy))
 
+        self.cam_x = desired_cx
+        self.cam_y = desired_cy
 
-        self.cam_x += (desired_cx - self.cam_x) * self.lerp
-        self.cam_y += (desired_cy - self.cam_y) * self.lerp
-
+    def world_to_screen(self, x, y):
+        sx = x - (self.cam_x - self.VIEW_W // 2) + self.draw_offset_x
+        sy = y - (self.cam_y - self.VIEW_H // 2) + self.draw_offset_y
+        return int(sx), int(sy)
