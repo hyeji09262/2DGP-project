@@ -7,6 +7,7 @@ import game_world
 from boy import Boy
 from field import Field
 
+field = None
 boy = None
 
 def handle_events():
@@ -20,13 +21,17 @@ def handle_events():
             boy.handle_event(event)
 
 def init():
-    global boy
+    global boy, field
 
-    field = Field()
+    field = Field('사진수집/background/헤네시스.png')
+    game_world.add_object(field, 0)
+    field.VIEW_W, field.VIEW_H = get_canvas_width(), get_canvas_height()
     game_world.add_object(field, 0)
 
     boy = Boy()
     game_world.add_object(boy, 1)
+
+    field.target = boy
 
    
 
@@ -42,7 +47,6 @@ def draw():
 
 def finish():
     game_world.clear()
-    pass
 
 def pause(): pass
 def resume(): pass
