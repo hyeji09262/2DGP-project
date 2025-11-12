@@ -59,7 +59,7 @@ class Field:
         self.image.clip_draw(left, bottom, self.VIEW_W, self.VIEW_H,
                              self.VIEW_W // 2, self.VIEW_H // 2)
 
-        self.draw_ground_debug(step_px=15)
+        #self.draw_ground_debug(step_px=15)
 
     def ground_y(self, x):
         gp = self.ground_profile
