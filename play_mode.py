@@ -12,6 +12,7 @@ field = None
 boy = None
 current_map = None
 _transition_cooldown = 0.0
+monsters = []
 
 MAPS = {
     "henesys": {
@@ -35,7 +36,8 @@ MAPS = {
         # 맨 왼쪽 세로 전체를 포털로 설정 → map2의 오른쪽에서 들어오게
         "portals": [
             {"rect": (50, 300, 100, 400), "to": "map2", "entry": "from_right", "require_up": True}
-        ]
+        ],
+        "spawn_monsters": False
     },
     "map2": {
         "image": "사진수집/background/헤네필드/헤네필드2.png",
@@ -56,7 +58,8 @@ MAPS = {
         # 맨 오른쪽 포털 → henesys의 왼쪽으로 들어감
         "portals": [
             {"rect": (950, 100, 1000, 200), "to": "henesys", "entry": "from_left",  "require_up": True}
-        ]
+        ],
+        "spawn_monsters": True
     },
 }
 
@@ -107,6 +110,24 @@ def load_map(name: str, entry: str = "default"):
         boy.up_pressed = False
 
     field.update()
+
+    for layer in game_world.world:
+        layer[:] = [o for o in layer if not isinstance(o, Mushroom)]
+    monsters.clear()
+
+    # 새 버섯 무작위 소환
+    if data.get("spawn_monsters", False):
+        width = data["width"]
+        cnt = random.randint(3, 6)
+        for _ in range(cnt):
+            x = random.randint(0, width)
+            y = field.ground_y(x) if hasattr(field, "ground_y") else 0
+            m = Mushroom(x, y, field=field)
+            m.set_world_bounds(0, width)
+            # 방향 랜덤
+            m.dir = random.choice([-1, 1])
+            game_world.add_object(m, 1)
+            monsters.append(m)
 
 def set_boy(b: Boy):
     global boy

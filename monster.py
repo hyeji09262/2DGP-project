@@ -33,7 +33,7 @@ class Mushroom:
         self.camera = None
         if field: self.set_camera(field)
 
-        # 월드 경계
+        # 월드 경계 (기본값 — playmode에서 맵 폭으로 덮어써줄 것)
         self.world_min_x = 0
         self.world_max_x = 5000
 
@@ -88,8 +88,3 @@ class Mushroom:
 
         flip = '' if self.dir == -1 else 'h'
         self.image.clip_composite_draw(left, START_Y, width, height, 0, flip, sx, y, DW, DH)
-    # 충돌 박스(원하면 숫자만 다듬어도 됨)
-    def get_bb(self):
-        hw = int(W * self.scale) // 2 - 6
-        hh = int(H * self.scale) // 2 - 6
-        return (self.x - hw, self.y - hh, self.x + hw, self.y + hh)
