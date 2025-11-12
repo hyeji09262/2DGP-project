@@ -28,28 +28,33 @@ MAPS = {
         ],
         "spawn": {
             "default":   (250, 400),
-            "from_left": (120, 400),
+            "from_left": (70, 400),
             "from_right":(4850, 220),
         },
         # 맨 왼쪽 세로 전체를 포털로 설정 → map2의 오른쪽에서 들어오게
         "portals": [
-            {"rect": (50, 200, 100, 400), "to": "map2", "entry": "from_right", "require_up": True}
+            {"rect": (50, 300, 100, 400), "to": "map2", "entry": "from_right", "require_up": True}
         ]
     },
     "map2": {
         "image": "사진수집/background/헤네필드/헤네필드2.png",
         "width": 1000,
         "ground": [
-            (0, 167), (1000, 167)
+            (0, 167),
+            (240, 167),
+            (350, 227),
+            (725, 227),
+            (825, 167),
+            (1000, 167)
         ],
         "spawn": {
             "default":   (275, 40),
             "from_left": (120, 40),
-            "from_right":(950, 450),
+            "from_right":(970, 450),
         },
         # 맨 오른쪽 포털 → henesys의 왼쪽으로 들어감
         "portals": [
-            {"rect": (950, 150, 1000, 400), "to": "henesys", "entry": "from_left",  "require_up": True}
+            {"rect": (950, 100, 1000, 200), "to": "henesys", "entry": "from_left",  "require_up": True}
         ]
     },
 }
@@ -59,6 +64,9 @@ def load_map(name: str, entry: str = "default"):
     global field, boy, current_map
     data = MAPS[name]
     current_map = name
+
+    for layer in game_world.world:  # world = [[],[],[]]
+        layer[:] = [o for o in layer if not isinstance(o, Boy)]
 
     # 이전 필드 제거
     if field:
@@ -72,17 +80,32 @@ def load_map(name: str, entry: str = "default"):
 
     # 보이 생성/재사용
     if not boy:
-        b = Boy()
-        set_boy(b)
-        game_world.add_object(boy, 1)
-
+        set_boy(Boy())
+        game_world.add_object(boy, 1)  # depth 1
+    else:
+        # boy가 world에 없으면 다시 add (중복 방지)
+        if all(boy not in layer for layer in game_world.world):
+            game_world.add_object(boy, 1)
     # 스폰 배치
     sx, sy = data["spawn"].get(entry, data["spawn"]["default"])
     boy.x, boy.y = sx, sy
+    if hasattr(field, "ground_y"):
+        boy.y = field.ground_y(boy.x)
 
     # 카메라 타겟 연결
     boy.set_camera(field)
     field.target = boy
+
+    hw, hh = field.VIEW_W / 2, field.VIEW_H / 2
+    max_cx = max(field.bg_w - hw, hw)
+    max_cy = max(field.bg_h - hh, hh)
+    field.cam_x = max(hw, min(boy.x, max_cx))
+    field.cam_y = max(hh, min(boy.y, max_cy))
+
+    if hasattr(boy, 'up_pressed'):
+        boy.up_pressed = False
+
+    field.update()
 
 def set_boy(b: Boy):
     global boy
@@ -136,18 +159,7 @@ def handle_events():
             boy.handle_event(event)
 
 def init():
-    global boy, field
     load_map("henesys", "default")
-
-    field = Field('사진수집/background/헤네시스.png', lerp=1.0)
-    field.VIEW_W, field.VIEW_H = get_canvas_width(), get_canvas_height()
-    game_world.add_object(field, 0)
-
-    boy = Boy()
-    boy.set_camera(field)
-    game_world.add_object(boy, 1)
-
-    field.target = boy
 
    
 
