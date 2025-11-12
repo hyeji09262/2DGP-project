@@ -6,6 +6,7 @@ import game_world
 
 from boy import Boy
 from field import Field
+from monster import Mushroom
 
 field = None
 boy = None
