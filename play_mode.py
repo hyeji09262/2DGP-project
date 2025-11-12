@@ -9,6 +9,121 @@ from field import Field
 
 field = None
 boy = None
+current_map = None
+_transition_cooldown = 0.0
+
+MAPS = {
+    "henesys": {
+        "image": "사진수집/background/헤네시스.png",
+        "width": 5000,
+         "ground": [
+            (0, 400),
+            (470, 400),
+            (550, 340),
+            (2550, 340),
+            (2630, 280),
+            (2700, 280),
+            (2780, 220),
+            (5000, 220)
+        ],
+        "spawn": {
+            "default":   (250, 400),
+            "from_left": (120, 400),
+            "from_right":(4850, 220),
+        },
+        # 맨 왼쪽 세로 전체를 포털로 설정 → map2의 오른쪽에서 들어오게
+        "portals": [
+            {"rect": (50, 200, 100, 400), "to": "map2", "entry": "from_right", "require_up": True}
+        ]
+    },
+    "map2": {
+        "image": "사진수집/background/헤네필드/헤네필드2.png",
+        "width": 1000,
+        "ground": [
+            (0, 167), (1000, 167)
+        ],
+        "spawn": {
+            "default":   (275, 40),
+            "from_left": (120, 40),
+            "from_right":(950, 450),
+        },
+        # 맨 오른쪽 포털 → henesys의 왼쪽으로 들어감
+        "portals": [
+            {"rect": (950, 150, 1000, 400), "to": "henesys", "entry": "from_left",  "require_up": True}
+        ]
+    },
+}
+
+def load_map(name: str, entry: str = "default"):
+    """맵 로드 + 필드/보이 배치"""
+    global field, boy, current_map
+    data = MAPS[name]
+    current_map = name
+
+    # 이전 필드 제거
+    if field:
+        game_world.remove_object(field)
+
+    # 새 필드 생성
+    field = Field(data["image"], lerp=0.15)
+    field.VIEW_W, field.VIEW_H = get_canvas_width(), get_canvas_height()
+    field.ground_profile = data["ground"][:]  # 지면 포인트 주입
+    game_world.add_object(field, 0)
+
+    # 보이 생성/재사용
+    if not boy:
+        b = Boy()
+        set_boy(b)
+        game_world.add_object(boy, 1)
+
+    # 스폰 배치
+    sx, sy = data["spawn"].get(entry, data["spawn"]["default"])
+    boy.x, boy.y = sx, sy
+
+    # 카메라 타겟 연결
+    boy.set_camera(field)
+    field.target = boy
+
+def set_boy(b: Boy):
+    global boy
+    boy = b
+
+def _overlap(a, b):
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    return (ax0 < bx1) and (ax1 > bx0) and (ay0 < by1) and (ay1 > by0)
+
+# --- 보이의 대략적인 바운딩박스(필요하면 boy.get_bb()로 교체) ---
+def _boy_bb():
+    # 캐릭터 스프라이트 크기에 맞춰 조정
+    half_w, half_h = 100, 40
+    return (boy.x - half_w, boy.y - half_h, boy.x + half_w, boy.y + half_h)
+
+def _check_portal_transition(dt):
+    """포털 사각형과 겹치면 해당 맵으로 전환"""
+    global _transition_cooldown
+    if _transition_cooldown > 0:
+        _transition_cooldown -= dt
+        return
+
+    portals = MAPS[current_map].get("portals", [])
+    bb = _boy_bb()
+
+    for p in portals:
+        x0, y0, x1, y1 = p["rect"]
+        need_up = p.get("require_up", False)
+        if _overlap(bb, (x0, y0, x1, y1)) and (not need_up or getattr(boy, "up_pressed", False)):
+            # print("PORTAL TRIGGER:", current_map, "->", p["to"])
+            load_map(p["to"], entry=p.get("entry", "default"))
+            _transition_cooldown = 0.25
+            return
+
+def _draw_portals_debug():
+    for p in MAPS[current_map].get("portals", []):
+        x0, y0, x1, y1 = p["rect"]
+        sx0, sy0 = field.world_to_screen(x0, y0)
+        sx1, sy1 = field.world_to_screen(x1, y1)
+        draw_rectangle(min(sx0, sx1), min(sy0, sy1), max(sx0, sx1), max(sy0, sy1))
 
 def handle_events():
     event_list = get_events()
@@ -22,6 +137,7 @@ def handle_events():
 
 def init():
     global boy, field
+    load_map("henesys", "default")
 
     field = Field('사진수집/background/헤네시스.png', lerp=1.0)
     field.VIEW_W, field.VIEW_H = get_canvas_width(), get_canvas_height()
@@ -37,12 +153,16 @@ def init():
 
 def update():
     game_world.update()
+    if field and hasattr(field, "ground_y") and not getattr(boy, 'up_pressed', False):
+        boy.y = field.ground_y(boy.x)
     field.update()
+    _check_portal_transition(game_framework.frame_time)
 
 
 def draw():
     clear_canvas()
     game_world.render()
+    _draw_portals_debug()
     update_canvas()
 
 

@@ -1,4 +1,4 @@
-from pico2d import load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP, SDLK_LEFT
+from pico2d import load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP, SDLK_LEFT , SDLK_UP
 
 import game_framework
 from state_machine import StateMachine
@@ -88,6 +88,8 @@ class Idle:
             # 다음 프레임으로
             self.seq = self.seq[1:] + self.seq[:1]
             self.boy.frame = self.seq[0]
+        if self.boy.up_pressed:
+            self.boy.y += RUN_SPEED_PPS * 0.6 * game_framework.frame_time
 
 
 
@@ -124,7 +126,7 @@ class Boy:
         self.foot_idle_adj = 52
         self.foot_run_adj = 47
 
-        self.x, self.y = 2500, 340
+        self.x, self.y = 500, 340
         self.frame = 0
         self.face_dir = 1
         self.dir = 0
@@ -132,6 +134,7 @@ class Boy:
         self.size = 1.0
         self.image = load_image('사진수집/character/캐릭터2.png')
         self.camera = None
+        self.up_pressed = False
 
         self.IDLE = Idle(self)
         self.Run = Run(self)
@@ -158,15 +161,15 @@ class Boy:
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
+        if event.type == SDL_KEYDOWN and event.key == SDLK_UP:
+            self.up_pressed = True
+        elif event.type == SDL_KEYUP and event.key == SDLK_UP:
+            self.up_pressed = False
 
 
     def draw(self):
         self.state_machine.draw()
 
-
-    def handle_event(self, event):
-        self.state_machine.handle_state_event(('INPUT', event))
-        pass
 
     def set_camera(self, cam):
         self.camera = cam
