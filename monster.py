@@ -28,6 +28,7 @@ class Mushroom:
         self.acc = 0.0
         self.scale = 0.8
         self.foot_adj = 45
+        self.bb_offset_y = 30
 
         self.image = load_image(SHEET_PATH)
         self.camera = None
@@ -88,3 +89,15 @@ class Mushroom:
 
         flip = '' if self.dir == -1 else 'h'
         self.image.clip_composite_draw(left, START_Y, width, height, 0, flip, sx, y, DW, DH)
+
+    def get_bb(self):
+        i = self.frame % FRAMES
+        w = FRAME_WIDTH[i]
+        h = FRAME_HEIGHT
+        S = getattr(self, 'scale', 1.0)
+        pad = 5  # 테두리 여유 (줄이고 싶으면 줄이기)
+
+        hw = int(w * S) // 2 - pad
+        hh = int(h * S) // 2 - pad
+        cx, cy = self.x, self.y - self.bb_offset_y  # ▼ 아래로 이동
+        return (cx - hw, cy - hh, cx + hw, cy + hh)

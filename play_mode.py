@@ -13,6 +13,8 @@ boy = None
 current_map = None
 _transition_cooldown = 0.0
 monsters = []
+DRAW_HITBOX = True
+_collision_grace = 0.0
 
 MAPS = {
     "henesys": {
@@ -65,7 +67,7 @@ MAPS = {
 
 def load_map(name: str, entry: str = "default"):
     """맵 로드 + 필드/보이 배치"""
-    global field, boy, current_map
+    global field, boy, current_map, _collision_grace
     data = MAPS[name]
     current_map = name
 
@@ -95,6 +97,13 @@ def load_map(name: str, entry: str = "default"):
     boy.x, boy.y = sx, sy
     if hasattr(field, "ground_y"):
         boy.y = field.ground_y(boy.x)
+
+    if entry == "from_right":
+        boy.x -= 40
+    elif entry == "from_left":
+        boy.x += 40
+
+    _collision_grace = 0.35
 
     # 카메라 타겟 연결
     boy.set_camera(field)
@@ -137,6 +146,14 @@ def _overlap(a, b):
     ax0, ay0, ax1, ay1 = a
     bx0, by0, bx1, by1 = b
     return (ax0 < bx1) and (ax1 > bx0) and (ay0 < by1) and (ay1 > by0)
+
+def _gather_monsters():
+    mons = []
+    for layer in game_world.world:
+        for o in layer:
+            if o.__class__.__name__ == 'Mushroom':
+                mons.append(o)
+    return mons
 
 # --- 보이의 대략적인 바운딩박스(필요하면 boy.get_bb()로 교체) ---
 def _boy_bb():
@@ -183,20 +200,60 @@ def handle_events():
 def init():
     load_map("henesys", "default")
 
-   
+
+def _handle_collisions():
+    if not field: return
+    if _collision_grace > 0:  # 전환 직후 충돌 스킵
+        return
+    bb_b = boy.get_bb()
+    mons = _gather_monsters()
+    for m in mons:
+        bb_m = m.get_bb()
+        if _overlap(bb_b, bb_m):
+            # 밀쳐내기(좌우 상대위치로 방향 결정)
+            push = 50
+            if boy.x < m.x:
+                boy.x -= push
+            else:
+                boy.x += push
+            # 한 번만 밀고 종료(겹침 반복 방지)
+            break
+
 
 def update():
+    global _collision_grace
     game_world.update()
     if field and hasattr(field, "ground_y") and not getattr(boy, 'up_pressed', False):
         boy.y = field.ground_y(boy.x)
     field.update()
+
     _check_portal_transition(game_framework.frame_time)
+
+    if _collision_grace > 0:
+        _collision_grace -= game_framework.frame_time
+
+    _handle_collisions()
 
 
 def draw():
     clear_canvas()
     game_world.render()
     _draw_portals_debug()
+
+    if DRAW_HITBOX and field:
+        # 캐릭터 박스
+        l, b, r, t = boy.get_bb()
+        sx0, sy0 = field.world_to_screen(l, b)
+        sx1, sy1 = field.world_to_screen(r, t)
+        draw_rectangle(sx0, sy0, sx1, sy1)  # 보통 빨간색으로 그려짐
+
+        # 몬스터 박스
+        for m in _gather_monsters():
+            l, b, r, t = m.get_bb()
+            sx0, sy0 = field.world_to_screen(l, b)
+            sx1, sy1 = field.world_to_screen(r, t)
+            draw_rectangle(sx0, sy0, sx1, sy1)
+
     update_canvas()
 
 

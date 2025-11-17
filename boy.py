@@ -122,6 +122,7 @@ class Boy:
         self.font = load_font('ENCR10B.TTF', 16)
 
         self.scale = 0.7
+        self.bb_offset_y = 30
 
         self.foot_idle_adj = 52
         self.foot_run_adj = 47
@@ -178,3 +179,12 @@ class Boy:
         if self.camera:
             return self.camera.world_to_screen(self.x, self.y)
         return self.x, self.y
+
+    def get_bb(self):
+        W, H = 90, 150
+        S = getattr(self, 'scale', 1.0)
+        pad_x, pad_y = 0, 0  # 박스 축소 여백(옵션)
+        hw = int(W * S) // 2 - pad_x
+        hh = int(H * S) // 2 - pad_y
+        cx, cy = self.x, self.y - self.bb_offset_y
+        return (cx - hw, cy - hh, cx + hw, cy + hh)
