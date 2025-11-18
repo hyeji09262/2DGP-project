@@ -15,6 +15,7 @@ _transition_cooldown = 0.0
 monsters = []
 DRAW_HITBOX = True
 _collision_grace = 0.0
+COLLIDE_IGNORE_PROB = 0.30
 
 MAPS = {
     "henesys": {
@@ -155,14 +156,24 @@ def _gather_monsters():
                 mons.append(o)
     return mons
 
-# --- 보이의 대략적인 바운딩박스(필요하면 boy.get_bb()로 교체) ---
+def _keep_boy_in_world():
+    if not field:
+        return
+
+    world_w = getattr(field, "bg_w", MAPS.get(current_map, {}).get("width", 1000))
+
+    l, b, r, t = boy.get_bb()
+    if l < 0:
+        boy.x += (0 - l)
+    if r > world_w:
+        boy.x += (world_w - r)
+
 def _boy_bb():
     # 캐릭터 스프라이트 크기에 맞춰 조정
     half_w, half_h = 100, 40
     return (boy.x - half_w, boy.y - half_h, boy.x + half_w, boy.y + half_h)
 
 def _check_portal_transition(dt):
-    """포털 사각형과 겹치면 해당 맵으로 전환"""
     global _transition_cooldown
     if _transition_cooldown > 0:
         _transition_cooldown -= dt
@@ -203,7 +214,7 @@ def init():
 
 def _handle_collisions():
     if not field: return
-    if _collision_grace > 0:  # 전환 직후 충돌 스킵
+    if getattr(boy, 'if_timer', 0) > 0:  # 전환 직후 충돌 스킵
         return
     bb_b = boy.get_bb()
     for layer in game_world.world:
@@ -229,6 +240,8 @@ def update():
 
     if _collision_grace > 0:
         _collision_grace -= game_framework.frame_time
+
+    _keep_boy_in_world()
 
     _handle_collisions()
 

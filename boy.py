@@ -124,7 +124,7 @@ class Hit:
     W, H = 100, 180
     PITCH = 103
     START_X = 220
-    START_Y = 300
+    START_Y = 200
 
     FRAMES = 1
     FPS = 2
@@ -189,7 +189,7 @@ class Boy:
 
         self.scale = 0.7
         self.bb_offset_y = 30
-        self.if_timer = 0.0
+        self.if_timer = 0.3
         self.Hit = Hit(self)
 
         self.foot_idle_adj = 52
@@ -274,6 +274,12 @@ class Boy:
         # 무적이면 무시
         if self.if_timer > 0:
             return
-        # 맞는 순간 바라보는 방향 갱신(옵션)
+        self.if_timer = 0.3
+        IMPULSE = 30
+        knock_dir = -1 if from_dir > 0 else 1
+        self.x += knock_dir * IMPULSE
+
+        # (선택) 피격 순간 바라보는 방향만 반대로
         self.face_dir = -1 if from_dir > 0 else 1
+
         self.state_machine.handle_state_event(('TAKE_HIT', from_dir))
