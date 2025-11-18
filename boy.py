@@ -189,7 +189,7 @@ class Boy:
 
         self.scale = 0.7
         self.bb_offset_y = 30
-        self.if_timer = 0.3
+        self.if_timer = 0.0
         self.Hit = Hit(self)
 
         self.foot_idle_adj = 52
@@ -274,12 +274,7 @@ class Boy:
         # 무적이면 무시
         if self.if_timer > 0:
             return
-        self.if_timer = 0.3
+        self.if_timer = 0.0
         IMPULSE = 30
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
-
-        # (선택) 피격 순간 바라보는 방향만 반대로
-        self.face_dir = -1 if from_dir > 0 else 1
-
-        self.state_machine.handle_state_event(('TAKE_HIT', from_dir))

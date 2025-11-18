@@ -15,7 +15,7 @@ _transition_cooldown = 0.0
 monsters = []
 DRAW_HITBOX = True
 _collision_grace = 0.0
-COLLIDE_IGNORE_PROB = 0.30
+COLLIDE_IGNORE_PROB = 0.8
 
 MAPS = {
     "henesys": {
@@ -216,15 +216,17 @@ def _handle_collisions():
     if not field: return
     if getattr(boy, 'if_timer', 0) > 0:  # 전환 직후 충돌 스킵
         return
-    bb_b = boy.get_bb()
+    bb_b = _shrink_bb(boy.get_bb(), 0.85)
     for layer in game_world.world:
         for o in layer:
             if o.__class__.__name__ != 'Mushroom':
                 continue
-            bb_m = o.get_bb()
+            bb_m = _shrink_bb(o.get_bb(), 0.80)
 
             if _overlap(bb_b, bb_m):
-                # ★ 여기 한 줄: 몬스터 쪽을 바라보는 방향으로 피격 트리거
+                if random.random() < COLLIDE_IGNORE_PROB:
+                    continue
+
                 from_dir = 1 if (o.x > boy.x) else -1
                 boy.take_hit(from_dir)
                 return
@@ -267,6 +269,13 @@ def draw():
 
     update_canvas()
 
+def _shrink_bb(bb, k=0.85):
+    l, b, r, t = bb
+    cx = (l + r) / 2
+    cy = (b + t) / 2
+    hw = (r - l) * 0.5 * k
+    hh = (t - b) * 0.5 * k
+    return (int(cx - hw), int(cy - hh), int(cx + hw), int(cy + hh))
 
 def finish():
     game_world.clear()
