@@ -116,6 +116,72 @@ class Idle:
             self.boy.image.clip_composite_draw(left, bottom, W, H,
                                                0, 'h', sx, y,DW,DH)
 
+class Hit:
+    HIT_TIME = 0.35
+    IF_TIME = 0.6
+    KNOCK_PPS = 600.0
+
+    W, H = 100, 180
+    PITCH = 103
+    START_X = 220
+    START_Y = 300
+
+    FRAMES = 1
+    FPS = 2
+
+    def __init__(self, boy):
+        self.boy = boy
+        self.t = 0.0
+        self.acc = 0.0
+        self.f = 0
+        self.knock_dir = -1
+
+    def enter(self, e):
+        # e == ('TAKE_HIT', from_dir)  → from_dir: 공격자가 바라보는 방향(+1/-1)
+        _, from_dir = e
+        self.t = self.HIT_TIME
+        self.acc = 0.0
+        self.f = 0
+        # 공격 반대방향으로 밀림
+        self.knock_dir = -1 if from_dir > 0 else 1
+        self.boy.if_timer = self.IF_TIME  # i-frame 시작
+
+    def exit(self, e):
+            pass
+
+    def do(self):
+            dt = game_framework.frame_time
+            # 경직 시간 카운트
+            self.t -= dt
+            if self.t <= 0:
+                self.boy.state_machine.handle_state_event(('END_HIT', 0))
+                return
+
+            # 넉백
+            self.boy.x += self.knock_dir * self.KNOCK_PPS * dt
+
+            # 피격 프레임 애니
+            self.acc += dt
+            step = 1.0 / self.FPS
+            while self.acc >= step:
+                self.acc -= step
+                self.f = (self.f + 1) % self.FRAMES
+
+    def draw(self):
+            W, H = self.W, self.H
+            left = self.START_X + (self.f % self.FRAMES) * self.PITCH
+            bottom = self.START_Y
+
+            sx, sy = self.boy.screen_xy()
+            S = self.boy.scale
+            DW, DH = int(W * S), int(H * S)
+
+            foot_fix = (DH - H) // 2
+            y = sy - foot_fix - getattr(self.boy, 'foot_idle_adj', 0)
+
+            flip = '' if self.boy.face_dir == -1 else 'h'
+            self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx,y, DW, DH)
+
 
 class Boy:
     def __init__(self):
@@ -123,6 +189,8 @@ class Boy:
 
         self.scale = 0.7
         self.bb_offset_y = 30
+        self.if_timer = 0.0
+        self.Hit = Hit(self)
 
         self.foot_idle_adj = 52
         self.foot_run_adj = 47
@@ -142,8 +210,17 @@ class Boy:
         self.state_machine = StateMachine(
             self.IDLE,
             {
-                self.IDLE : {right_up : self.Run, left_up : self.Run, left_down : self.Run, right_down : self.Run},
-                self.Run : {left_down : self.IDLE, right_down : self.IDLE, left_up : self.IDLE, right_up : self.IDLE},
+                self.IDLE: {
+                    right_up: self.Run, left_up: self.Run, left_down: self.Run, right_down: self.Run,
+                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
+                },
+                self.Run: {
+                    left_down: self.IDLE, right_down: self.IDLE, left_up: self.IDLE, right_up: self.IDLE,
+                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
+                },
+                self.Hit: {
+                    (lambda e: e[0] == 'END_HIT'): self.IDLE
+                }
             }
         )
 
@@ -159,6 +236,9 @@ class Boy:
             ground = self.camera.ground_y(self.x)
             foot_offset = 0  # 스프라이트 발 위치 보정 필요하면 숫자 조절(+/-)
             self.y = ground + foot_offset
+        if self.if_timer > 0:
+            self.if_timer -= game_framework.frame_time
+        self.state_machine.update()
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
@@ -170,6 +250,7 @@ class Boy:
 
     def draw(self):
         self.state_machine.draw()
+
 
 
     def set_camera(self, cam):
@@ -188,3 +269,11 @@ class Boy:
         hh = int(H * S) // 2 - pad_y
         cx, cy = self.x, self.y - self.bb_offset_y
         return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+    def take_hit(self, from_dir: int):
+        # 무적이면 무시
+        if self.if_timer > 0:
+            return
+        # 맞는 순간 바라보는 방향 갱신(옵션)
+        self.face_dir = -1 if from_dir > 0 else 1
+        self.state_machine.handle_state_event(('TAKE_HIT', from_dir))

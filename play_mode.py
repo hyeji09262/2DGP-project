@@ -206,19 +206,17 @@ def _handle_collisions():
     if _collision_grace > 0:  # 전환 직후 충돌 스킵
         return
     bb_b = boy.get_bb()
-    mons = _gather_monsters()
-    for m in mons:
-        bb_m = m.get_bb()
-        if _overlap(bb_b, bb_m):
-            # 밀쳐내기(좌우 상대위치로 방향 결정)
-            push = 50
-            if boy.x < m.x:
-                boy.x -= push
-            else:
-                boy.x += push
-            # 한 번만 밀고 종료(겹침 반복 방지)
-            break
+    for layer in game_world.world:
+        for o in layer:
+            if o.__class__.__name__ != 'Mushroom':
+                continue
+            bb_m = o.get_bb()
 
+            if _overlap(bb_b, bb_m):
+                # ★ 여기 한 줄: 몬스터 쪽을 바라보는 방향으로 피격 트리거
+                from_dir = 1 if (o.x > boy.x) else -1
+                boy.take_hit(from_dir)
+                return
 
 def update():
     global _collision_grace
