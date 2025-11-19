@@ -30,6 +30,10 @@ class Run:
             self.boy.dir = self.boy.face_dir = 1
         elif left_down(e) or right_up(e):
             self.boy.dir = self.boy.face_dir = -1
+        if right_down(e):
+            self.boy.dir = self.boy.face_dir = 1
+        elif left_down(e):
+            self.boy.dir = self.boy.face_dir = -1
 
     def exit(self, e):
         pass
@@ -123,7 +127,7 @@ class Hit:
 
     W, H = 100, 180
     PITCH = 103
-    START_X = 220
+    START_X = 240
     START_Y = 200
 
     FRAMES = 1
@@ -159,6 +163,7 @@ class Hit:
 
             # 넉백
             self.boy.x += self.knock_dir * self.KNOCK_PPS * dt
+            self.boy.x += self.boy.dir * RUN_SPEED_PPS * dt
 
             # 피격 프레임 애니
             self.acc += dt
@@ -189,6 +194,7 @@ class Boy:
 
         self.scale = 0.7
         self.bb_offset_y = 30
+        self.if_timer = 0.8
         self.if_timer = 0.0
         self.Hit = Hit(self)
 
@@ -220,6 +226,20 @@ class Boy:
                 },
                 self.Hit: {
                     (lambda e: e[0] == 'END_HIT'): self.IDLE
+                },
+
+                self.IDLE: {
+                    right_down: self.Run, left_down: self.Run,
+                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
+                },
+                self.Run: {
+                    right_up: self.IDLE, left_up: self.IDLE,
+                     # (누른 상태에서 또 keydown 들어오면 Run 유지)
+                    right_down: self.Run, left_down: self.Run,
+                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
+                },
+                self.Hit: {
+                    (lambda e: e[0] == 'END_HIT'): self.IDLE
                 }
             }
         )
@@ -238,7 +258,6 @@ class Boy:
             self.y = ground + foot_offset
         if self.if_timer > 0:
             self.if_timer -= game_framework.frame_time
-        self.state_machine.update()
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
@@ -274,7 +293,8 @@ class Boy:
         # 무적이면 무시
         if self.if_timer > 0:
             return
-        self.if_timer = 0.0
-        IMPULSE = 30
+        self.if_timer = 0.5
+        IMPULSE = 60
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
+        self.state_machine.handle_state_event(('TAKE_HIT', from_dir))

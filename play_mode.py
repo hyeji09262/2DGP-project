@@ -216,12 +216,12 @@ def _handle_collisions():
     if not field: return
     if getattr(boy, 'if_timer', 0) > 0:  # 전환 직후 충돌 스킵
         return
-    bb_b = _shrink_bb(boy.get_bb(), 0.85)
+    bb_b = boy.get_bb()
     for layer in game_world.world:
         for o in layer:
             if o.__class__.__name__ != 'Mushroom':
                 continue
-            bb_m = _shrink_bb(o.get_bb(), 0.80)
+            bb_m = o.get_bb()
 
             if _overlap(bb_b, bb_m):
                 if random.random() < COLLIDE_IGNORE_PROB:
@@ -269,13 +269,6 @@ def draw():
 
     update_canvas()
 
-def _shrink_bb(bb, k=0.85):
-    l, b, r, t = bb
-    cx = (l + r) / 2
-    cy = (b + t) / 2
-    hw = (r - l) * 0.5 * k
-    hh = (t - b) * 0.5 * k
-    return (int(cx - hw), int(cy - hh), int(cx + hw), int(cy + hh))
 
 def finish():
     game_world.clear()
