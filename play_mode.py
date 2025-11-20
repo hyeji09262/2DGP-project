@@ -169,7 +169,6 @@ def _keep_boy_in_world():
         boy.x += (world_w - r)
 
 def _boy_bb():
-    # 캐릭터 스프라이트 크기에 맞춰 조정
     half_w, half_h = 100, 40
     return (boy.x - half_w, boy.y - half_h, boy.x + half_w, boy.y + half_h)
 

@@ -121,9 +121,9 @@ class Idle:
                                                0, 'h', sx, y,DW,DH)
 
 class Hit:
-    HIT_TIME = 0.35
+    HIT_TIME = 0.2
     IF_TIME = 0.5
-    KNOCK_PPS = 600.0
+    KNOCK_PPS = 250
 
     W, H = 100, 180
     PITCH = 103
@@ -270,22 +270,21 @@ class Boy:
 
 
     def draw(self):
-        if self.if_timer > 0:
-            if (int(get_time() * 10) % 2) == 0:
-                return
+        flicker = (self.if_timer > 0.0) and ((int(get_time() * 10) % 2) == 0)
 
-        self.state_machine.draw()
-        if self.if_timer > 0 and (int(get_time() * 20) % 2) == 0:
+        if flicker:
             try:
-                self.image.opacify(0.4)
+                self.image.opacify(0.35)
             except:
                 pass
-        self.state_machine.draw()
-        try:
-            self.image.opacify(1.0)
-        except:
-            pass
 
+        self.state_machine.draw()
+
+        if flicker:
+            try:
+                self.image.opacify(1.0)
+            except:
+                pass
 
 
     def set_camera(self, cam):
@@ -310,7 +309,7 @@ class Boy:
             return
 
         self.if_timer = 0.5
-        IMPULSE = 60
+        IMPULSE = 20
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
 
