@@ -122,7 +122,7 @@ class Idle:
 
 class Hit:
     HIT_TIME = 0.35
-    IF_TIME = 0.6
+    IF_TIME = 0.5
     KNOCK_PPS = 600.0
 
     W, H = 100, 180
@@ -139,6 +139,7 @@ class Hit:
         self.acc = 0.0
         self.f = 0
         self.knock_dir = -1
+        self.if_timer = 0.0
 
     def enter(self, e):
         # e == ('TAKE_HIT', from_dir)  → from_dir: 공격자가 바라보는 방향(+1/-1)
@@ -194,7 +195,6 @@ class Boy:
 
         self.scale = 0.7
         self.bb_offset_y = 30
-        self.if_timer = 0.8
         self.if_timer = 0.0
         self.Hit = Hit(self)
 
@@ -254,10 +254,12 @@ class Boy:
         self.state_machine.update()
         if self.camera and hasattr(self.camera, 'ground_y'):
             ground = self.camera.ground_y(self.x)
-            foot_offset = 0  # 스프라이트 발 위치 보정 필요하면 숫자 조절(+/-)
+            foot_offset = 0
             self.y = ground + foot_offset
         if self.if_timer > 0:
             self.if_timer -= game_framework.frame_time
+            if self.if_timer < 0:
+                self.if_timer = 0.0
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
@@ -268,7 +270,21 @@ class Boy:
 
 
     def draw(self):
+        if self.if_timer > 0:
+            if (int(get_time() * 10) % 2) == 0:
+                return
+
         self.state_machine.draw()
+        if self.if_timer > 0 and (int(get_time() * 20) % 2) == 0:
+            try:
+                self.image.opacify(0.4)
+            except:
+                pass
+        self.state_machine.draw()
+        try:
+            self.image.opacify(1.0)
+        except:
+            pass
 
 
 
@@ -283,18 +299,19 @@ class Boy:
     def get_bb(self):
         W, H = 90, 150
         S = getattr(self, 'scale', 1.0)
-        pad_x, pad_y = 0, 0  # 박스 축소 여백(옵션)
+        pad_x, pad_y = 0, 0
         hw = int(W * S) // 2 - pad_x
         hh = int(H * S) // 2 - pad_y
         cx, cy = self.x, self.y - self.bb_offset_y
         return (cx - hw, cy - hh, cx + hw, cy + hh)
 
     def take_hit(self, from_dir: int):
-        # 무적이면 무시
         if self.if_timer > 0:
             return
+
         self.if_timer = 0.5
         IMPULSE = 60
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
+
         self.state_machine.handle_state_event(('TAKE_HIT', from_dir))

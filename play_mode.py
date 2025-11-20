@@ -213,7 +213,6 @@ def init():
 
 
 def _handle_collisions():
-    if not field: return
     if getattr(boy, 'if_timer', 0) > 0:  # 전환 직후 충돌 스킵
         return
     bb_b = boy.get_bb()
@@ -221,12 +220,8 @@ def _handle_collisions():
         for o in layer:
             if o.__class__.__name__ != 'Mushroom':
                 continue
-            bb_m = o.get_bb()
 
-            if _overlap(bb_b, bb_m):
-                if random.random() < COLLIDE_IGNORE_PROB:
-                    continue
-
+            if _overlap(bb_b, o.get_bb()):
                 from_dir = 1 if (o.x > boy.x) else -1
                 boy.take_hit(from_dir)
                 return
