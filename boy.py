@@ -43,10 +43,10 @@ class Run:
         self.boy.x += self.boy.dir * RUN_SPEED_PPS * game_framework.frame_time
 
     def draw(self):
-        W, H = 100, 160  # 프레임 가로/세로
-        PITCH = 105  # 다음 프레임까지 이동량(여백 없으면 W와 같게)
-        START_X = 225 # 첫 프레임의 left
-        START_Y= 1075 # 줄의 bottom(y)
+        W, H = 55, 80
+        PITCH = 65  # 프레임 간 간격 (칸폭+여백)
+        START_X = 0
+        START_Y = 615  # 그 줄의 bottom
 
         left = START_X + (self.boy.frame % 4) * PITCH
         bottom = START_Y
@@ -98,10 +98,10 @@ class Idle:
 
 
     def draw(self):
-        W, H = 100, 180
-        PITCH = 103# 프레임 간 간격 (칸폭+여백)
-        START_X = 220
-        START_Y = 1260  # 그 줄의 bottom
+        W, H = 55, 80
+        PITCH = 58 # 프레임 간 간격 (칸폭+여백)
+        START_X = 0
+        START_Y = 720  # 그 줄의 bottom
 
         left = START_X + (self.boy.frame % 2) * PITCH
         bottom = START_Y
@@ -125,10 +125,10 @@ class Hit:
     IF_TIME = 0.5
     KNOCK_PPS = 250
 
-    W, H = 100, 180
-    PITCH = 103
-    START_X = 240
-    START_Y = 200
+    W, H = 55, 100
+    PITCH = 60  # 프레임 간 간격 (칸폭+여백)
+    START_X = 0
+    START_Y = 750  # 그 줄의 bottom
 
     FRAMES = 1
     FPS = 2
@@ -193,13 +193,15 @@ class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
 
-        self.scale = 0.7
-        self.bb_offset_y = 30
+        self.scale = 1.2
+        self.bb_offset_y = 40
+        self.bb_offset_x = -10
+
         self.if_timer = 0.0
         self.Hit = Hit(self)
 
-        self.foot_idle_adj = 52
-        self.foot_run_adj = 47
+        self.foot_idle_adj = 36
+        self.foot_run_adj = 36
 
         self.x, self.y = 500, 340
         self.frame = 0
@@ -207,7 +209,7 @@ class Boy:
         self.dir = 0
         self.velocity = 0
         self.size = 1.0
-        self.image = load_image('사진수집/character/캐릭터2.png')
+        self.image = load_image('사진수집/character/캐릭터 3.png')
         self.camera = None
         self.up_pressed = False
 
@@ -287,6 +289,8 @@ class Boy:
                 pass
 
 
+
+
     def set_camera(self, cam):
         self.camera = cam
 
@@ -296,13 +300,21 @@ class Boy:
         return self.x, self.y
 
     def get_bb(self):
-        W, H = 90, 150
+        W, H = 35, 60
         S = getattr(self, 'scale', 1.0)
-        pad_x, pad_y = 0, 0
-        hw = int(W * S) // 2 - pad_x
-        hh = int(H * S) // 2 - pad_y
-        cx, cy = self.x, self.y - self.bb_offset_y
+
+
+        hw = int(W * S) // 2
+        hh = int(H * S) // 2
+
+        shift = -7
+        offset_x = shift * self.face_dir
+
+        cx = self.x + offset_x
+        cy = self.y - self.bb_offset_y
+
         return (cx - hw, cy - hh, cx + hw, cy + hh)
+
 
     def take_hit(self, from_dir: int):
         if self.if_timer > 0:
