@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP)
 
 import game_framework
 from state_machine import StateMachine
@@ -190,17 +190,24 @@ class Hit:
 class Jump:
     GRAVITY_PPS = 1500.0
     JUMP_SPEED_PPS = 550.0
+    MOVE_RATIO = 0.6
 
     def __init__(self, boy):
         self.boy = boy
         self.vy = 0.0
         self.acc = 0.0
         self.fps = 8.0
+        self.hdir = 0
 
     def enter(self, e):
         self.vy = self.JUMP_SPEED_PPS
         self.acc = 0.0
         self.boy.in_air = True
+
+        if self.boy.dir != 0:
+            self.hdir = self.boy.dir
+        else:
+            self.hdir = self.boy.face_dir
 
     def exit(self, e):
         self.boy.in_air = False
@@ -210,18 +217,18 @@ class Jump:
         dt = game_framework.frame_time
         self.vy -= self.GRAVITY_PPS * dt
         self.boy.y += self.vy * dt
-        self.boy.x += self.boy.dir * RUN_SPEED_PPS * dt
-        self.boy.frame = (self.boy.frame + 1) % 4
+        self.boy.x += self.hdir * RUN_SPEED_PPS * self.MOVE_RATIO * dt
+        self.boy.frame = (self.boy.frame + 1) % 1
 
         if self.boy.camera and hasattr(self.boy.camera, 'ground_y'):
             ground_y = self.boy.camera.ground_y(self.boy.x)
         else:
             ground_y = self.boy.base_ground_y
 
-        if self.boy.camera and hasattr(self.boy.camera, 'ground_y'):
-            ground_y = self.boy.camera.ground_y(self.boy.x)
-        else:
-            ground_y = self.boy.base_ground_y
+        if self.boy.y <= ground_y:
+            self.boy.y = ground_y
+            self.boy.state_machine.handle_state_event(('LAND', 0))
+            return
 
     def draw(self):
         W, H = 55, 80
@@ -313,6 +320,9 @@ class Boy:
             ground = self.camera.ground_y(self.x)
             foot_offset = 0
             self.y = ground + foot_offset
+        else:
+            if not self.in_air:
+                self.y = self.base_ground_y
 
         if self.if_timer > 0:
             self.if_timer -= game_framework.frame_time
