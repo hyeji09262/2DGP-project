@@ -207,7 +207,7 @@ class Jump:
         if self.boy.dir != 0:
             self.hdir = self.boy.dir
         else:
-            self.hdir = self.boy.face_dir
+            self.hdir = 0
 
     def exit(self, e):
         self.boy.in_air = False
@@ -247,10 +247,8 @@ class Jump:
         foot_fix = (DH - H) // 2
         y = sy - foot_fix - self.boy.foot_run_adj
 
-        if self.boy.face_dir == -1:
-            self.boy.image.clip_composite_draw(left, bottom, W, H, 0, '', sx, y, DW, DH)
-        else:
-            self.boy.image.clip_composite_draw(left, bottom, W, H, 0, 'h', sx, y, DW, DH)
+        flip = '' if self.boy.face_dir == -1 else 'h'
+        self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx, y, DW, DH)
 
 
 class Boy:
