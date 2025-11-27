@@ -94,9 +94,6 @@ class Idle:
             # 다음 프레임으로
             self.seq = self.seq[1:] + self.seq[:1]
             self.boy.frame = self.seq[0]
-        if self.boy.up_pressed:
-            self.boy.y += RUN_SPEED_PPS * 0.6 * game_framework.frame_time
-
 
 
     def draw(self):
@@ -190,6 +187,64 @@ class Hit:
             flip = '' if self.boy.face_dir == -1 else 'h'
             self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx,y, DW, DH)
 
+class Jump:
+    GRAVITY_PPS = 1500.0
+    JUMP_SPEED_PPS = 550.0
+
+    def __init__(self, boy):
+        self.boy = boy
+        self.vy = 0.0
+        self.acc = 0.0
+        self.fps = 8.0
+
+    def enter(self, e):
+        self.vy = self.JUMP_SPEED_PPS
+        self.acc = 0.0
+        self.boy.in_air = True
+
+    def exit(self, e):
+        self.boy.in_air = False
+        self.vy = 0.0
+
+    def do(self):
+        dt = game_framework.frame_time
+        self.vy -= self.GRAVITY_PPS * dt
+        self.boy.y += self.vy * dt
+        self.boy.x += self.boy.dir * RUN_SPEED_PPS * dt
+        self.boy.frame = (self.boy.frame + 1) % 4
+
+        if self.boy.camera and hasattr(self.boy.camera, 'ground_y'):
+            ground_y = self.boy.camera.ground_y(self.boy.x)
+        else:
+            ground_y = self.boy.base_ground_y
+
+        if self.boy.camera and hasattr(self.boy.camera, 'ground_y'):
+            ground_y = self.boy.camera.ground_y(self.boy.x)
+        else:
+            ground_y = self.boy.base_ground_y
+
+    def draw(self):
+        W, H = 55, 80
+        PITCH = 65
+        START_X = 0
+        START_Y = 615
+
+        left = START_X + (self.boy.frame % 4) * PITCH
+        bottom = START_Y
+
+        sx, sy = self.boy.screen_xy()
+
+        S = self.boy.scale
+        DW, DH = int(W * S), int(H * S)
+
+        foot_fix = (DH - H) // 2
+        y = sy - foot_fix - self.boy.foot_run_adj
+
+        if self.boy.face_dir == -1:
+            self.boy.image.clip_composite_draw(left, bottom, W, H, 0, '', sx, y, DW, DH)
+        else:
+            self.boy.image.clip_composite_draw(left, bottom, W, H, 0, 'h', sx, y, DW, DH)
+
 
 class Boy:
     def __init__(self):
@@ -206,6 +261,9 @@ class Boy:
         self.foot_run_adj = 36
 
         self.x, self.y = 500, 340
+        self.base_ground_y = self.y
+        self.in_air = False
+
         self.frame = 0
         self.face_dir = 1
         self.dir = 0
@@ -217,34 +275,29 @@ class Boy:
 
         self.IDLE = Idle(self)
         self.Run = Run(self)
+        self.Jump = Jump(self)
         self.state_machine = StateMachine(
             self.IDLE,
             {
                 self.IDLE: {
-                    right_up: self.Run, left_up: self.Run, left_down: self.Run, right_down: self.Run,
+                    right_up: self.Run, left_up: self.Run, left_down: self.Run, right_down: self.Run,ctrl_down: self.Jump,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Run: {
-                    left_down: self.IDLE, right_down: self.IDLE, left_up: self.IDLE, right_up: self.IDLE,
+                    left_down: self.IDLE, right_down: self.IDLE, left_up: self.IDLE, right_up: self.IDLE,ctrl_down: self.Jump,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Hit: {
                     (lambda e: e[0] == 'END_HIT'): self.IDLE
                 },
 
-                self.IDLE: {
-                    right_down: self.Run, left_down: self.Run,
-                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
+                self.Jump: {
+                    # 점프 중 피격
+                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit,
+                    # 착지 이벤트
+                    (lambda e: e[0] == 'LAND'): self.IDLE
                 },
-                self.Run: {
-                    right_up: self.IDLE, left_up: self.IDLE,
-                     # (누른 상태에서 또 keydown 들어오면 Run 유지)
-                    right_down: self.Run, left_down: self.Run,
-                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
-                },
-                self.Hit: {
-                    (lambda e: e[0] == 'END_HIT'): self.IDLE
-                }
+
             }
         )
 
@@ -260,6 +313,7 @@ class Boy:
             ground = self.camera.ground_y(self.x)
             foot_offset = 0
             self.y = ground + foot_offset
+
         if self.if_timer > 0:
             self.if_timer -= game_framework.frame_time
             if self.if_timer < 0:
