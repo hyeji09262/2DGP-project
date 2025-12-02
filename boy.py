@@ -125,10 +125,10 @@ class Hit:
     IF_TIME = 0.5
     KNOCK_PPS = 250
 
-    W, H = 55, 100
+    W, H = 55, 80
     PITCH = 60  # 프레임 간 간격 (칸폭+여백)
     START_X = 0
-    START_Y = 750  # 그 줄의 bottom
+    START_Y = 100  # 그 줄의 bottom
 
     FRAMES = 1
     FPS = 2
