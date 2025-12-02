@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z)
 
 import game_framework
 from state_machine import StateMachine
