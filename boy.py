@@ -117,7 +117,7 @@ class Idle:
                                                0, 'h', sx, y,DW,DH)
 
 class Hit:
-    HIT_TIME = 0.2
+    HIT_TIME = 1.0
     IF_TIME = 0.5
     KNOCK_PPS = 250
 
@@ -185,8 +185,8 @@ class Hit:
             self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx,y, DW, DH)
 
 class Jump:
-    GRAVITY_PPS = 1500.0
-    JUMP_SPEED_PPS = 600.0
+    GRAVITY_PPS = 1700.0
+    JUMP_SPEED_PPS = 800.0
     MOVE_RATIO = 0.6
 
     def __init__(self, boy):
@@ -438,7 +438,7 @@ class Boy:
         if self.if_timer > 0:
             return
 
-        self.if_timer = 0.5
+        self.if_timer = Hit.IF_TIME
         IMPULSE = 20
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
