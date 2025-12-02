@@ -22,6 +22,8 @@ def left_up(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key == SDLK_LEFT
 def jump_key(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_LCTRL
+def attack_key(e):
+    return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_z
 
 class Run:
     def __init__(self, boy):
@@ -185,8 +187,8 @@ class Hit:
             self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx,y, DW, DH)
 
 class Jump:
-    GRAVITY_PPS = 1700.0
-    JUMP_SPEED_PPS = 800.0
+    GRAVITY_PPS = 2000.0
+    JUMP_SPEED_PPS = 700.0
     MOVE_RATIO = 0.6
 
     def __init__(self, boy):
@@ -247,6 +249,71 @@ class Jump:
         flip = '' if self.boy.face_dir == -1 else 'h'
         self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx, y, DW, DH)
 
+class Attack:
+    DURATION = 0.35  # 전체 공격 모션 시간
+    HIT_START = 0.10  # 이 시점부터
+    HIT_END = 0.25  # 이 시점까지 공격 판정 활성
+
+    W, H = 70, 80
+    PITCH = 50
+    START_X = 0
+    START_Y = 470
+
+    def __init__(self, boy):
+        self.boy = boy
+        self.t = 0.0
+        self.acc = 0.0
+        self.fps = 12.0
+        self.f = 0
+
+
+
+    def enter(self, e):
+        self.t = 0.0
+        self.acc = 0.0
+        self.f = 0
+        self.boy.attack_active = False  # 공격 판정 OFF
+
+
+    def exit(self, e):
+        self.boy.attack_active = False  # 상태 나갈 때 항상 OFF
+
+    def do(self):
+        dt = game_framework.frame_time
+        self.t += dt
+
+        if self.HIT_START <= self.t <= self.HIT_END:
+            self.boy.attack_active = True
+        else:
+            self.boy.attack_active = False
+
+        self.boy.x += self.boy.face_dir * RUN_SPEED_PPS * 0.15 * dt
+
+        self.acc += dt
+        step = 1.0 / self.fps
+        while self.acc >= step:
+            self.acc -= step
+            self.f = (self.f + 1) % 6
+
+        if self.t >= self.DURATION:
+            self.boy.attack_active = False
+            self.boy.state_machine.handle_state_event(('END_ATTACK', 0))
+
+    def draw(self):
+        W, H = self.W, self.H
+        left = self.START_X + (self.f % 4) * self.PITCH
+        bottom = self.START_Y
+
+        sx, sy = self.boy.screen_xy()
+
+        S = self.boy.scale
+        DW, DH = int(W * S), int(H * S)
+        foot_fix = (DH - H) // 2
+        y = sy - foot_fix - self.boy.foot_run_adj
+
+        flip = '' if self.boy.face_dir == -1 else 'h'
+        self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx, y, DW, DH)
+
 
 class Boy:
     def __init__(self):
@@ -276,6 +343,8 @@ class Boy:
         self.up_pressed = False
         self.left_pressed = False
         self.right_pressed = False
+        self.attack_active = False
+        self.attack_style = 0
 
         def land_to_run(e, boy=self):
             return (e[0] == 'LAND') and (boy.left_pressed or boy.right_pressed)
@@ -295,9 +364,17 @@ class Boy:
         def right_up_to_run(e, boy=self):
             return right_up(e) and boy.left_pressed
 
+        def attack_end_to_run(e, boy=self):
+            return (e[0] == 'END_ATTACK') and (boy.left_pressed or boy.right_pressed)
+
+        def attack_end_to_idle(e, boy=self):
+            return (e[0] == 'END_ATTACK') and (not boy.left_pressed and not boy.right_pressed)
+
         self.IDLE = Idle(self)
         self.Run = Run(self)
         self.Jump = Jump(self)
+        self.Attack = Attack(self)
+
         self.state_machine = StateMachine(
             self.IDLE,
             {
@@ -305,6 +382,7 @@ class Boy:
                     left_down: self.Run,
                     right_down: self.Run,
                     jump_key: self.Jump,
+                    attack_key: self.Attack,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Run: {
@@ -319,6 +397,7 @@ class Boy:
                     right_up_to_run: self.Run,
 
                     jump_key: self.Jump,
+                    attack_key: self.Attack,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Hit: {
@@ -330,6 +409,11 @@ class Boy:
                     land_to_idle: self.IDLE,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit,
                     (lambda e: e[0] == 'LAND'): self.IDLE
+                },
+                self.Attack: {
+                    attack_end_to_run: self.Run,  # 공격 끝 + 방향키 있음 → Run
+                    attack_end_to_idle: self.IDLE,  # 공격 끝 + 방향키 없음 → Idle
+                    (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
 
             }
@@ -432,6 +516,19 @@ class Boy:
         cy = self.y - self.bb_offset_y
 
         return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+    def get_attack_bb(self):
+        bx0, by0, bx1, by1 = self.get_bb()
+
+        reach = 45
+        h = by1 - by0
+        ay0 = by0 + int(h * 0.3)
+        ay1 = by1
+
+        if self.face_dir == 1:
+            return (bx1, ay0, bx1 + reach, ay1)
+        else:
+            return (bx0 - reach, ay0, bx0, ay1)
 
 
     def take_hit(self, from_dir: int):
