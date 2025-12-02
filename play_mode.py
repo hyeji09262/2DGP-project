@@ -228,8 +228,9 @@ def _handle_collisions():
 def update():
     global _collision_grace
     game_world.update()
-    if field and hasattr(field, "ground_y") and not getattr(boy, 'up_pressed', False):
+    if field and hasattr(field, "ground_y") and not getattr(boy, 'in_air', False):
         boy.y = field.ground_y(boy.x)
+
     field.update()
 
     _check_portal_transition(game_framework.frame_time)
@@ -238,7 +239,6 @@ def update():
         _collision_grace -= game_framework.frame_time
 
     _keep_boy_in_world()
-
     _handle_collisions()
 
 

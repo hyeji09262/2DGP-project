@@ -20,7 +20,7 @@ def left_down(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_LEFT
 def left_up(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key == SDLK_LEFT
-def ctrl_down(e):
+def jump_key(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_LCTRL
 
 class Run:
@@ -94,6 +94,7 @@ class Idle:
             # 다음 프레임으로
             self.seq = self.seq[1:] + self.seq[:1]
             self.boy.frame = self.seq[0]
+
 
 
     def draw(self):
@@ -189,7 +190,7 @@ class Hit:
 
 class Jump:
     GRAVITY_PPS = 1500.0
-    JUMP_SPEED_PPS = 550.0
+    JUMP_SPEED_PPS = 600.0
     MOVE_RATIO = 0.6
 
     def __init__(self, boy):
@@ -285,11 +286,11 @@ class Boy:
             self.IDLE,
             {
                 self.IDLE: {
-                    right_up: self.Run, left_up: self.Run, left_down: self.Run, right_down: self.Run,ctrl_down: self.Jump,
+                    left_down: self.Run, right_down: self.Run, jump_key: self.Jump,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Run: {
-                    left_down: self.IDLE, right_down: self.IDLE, left_up: self.IDLE, right_up: self.IDLE,ctrl_down: self.Jump,
+                    left_down: self.IDLE, right_down: self.IDLE, left_up: self.IDLE, right_up: self.IDLE, jump_key: self.Jump,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Hit: {
@@ -315,9 +316,9 @@ class Boy:
     def update(self):
         self.state_machine.update()
         if self.camera and hasattr(self.camera, 'ground_y'):
-            ground = self.camera.ground_y(self.x)
-            foot_offset = 0
-            self.y = ground + foot_offset
+            if not self.in_air:  # 🔥 in_air 아닐 때만
+                ground = self.camera.ground_y(self.x)
+                self.y = ground
         else:
             if not self.in_air:
                 self.y = self.base_ground_y
@@ -351,8 +352,6 @@ class Boy:
                 self.image.opacify(1.0)
             except:
                 pass
-
-
 
 
     def set_camera(self, cam):
