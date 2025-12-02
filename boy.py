@@ -28,10 +28,6 @@ class Run:
         self.boy = boy
 
     def enter(self, e):
-        if right_down(e) or left_up(e):
-            self.boy.dir = self.boy.face_dir = 1
-        elif left_down(e) or right_up(e):
-            self.boy.dir = self.boy.face_dir = -1
         if right_down(e):
             self.boy.dir = self.boy.face_dir = 1
         elif left_down(e):
@@ -278,6 +274,26 @@ class Boy:
         self.image = load_image('사진수집/character/캐릭터 3.png')
         self.camera = None
         self.up_pressed = False
+        self.left_pressed = False
+        self.right_pressed = False
+
+        def land_to_run(e, boy=self):
+            return (e[0] == 'LAND') and (boy.left_pressed or boy.right_pressed)
+
+        def land_to_idle(e, boy=self):
+            return (e[0] == 'LAND') and (not boy.left_pressed and not boy.right_pressed)
+
+        def left_up_to_idle(e, boy=self):
+            return left_up(e) and (not boy.right_pressed)
+
+        def left_up_to_run(e, boy=self):
+            return left_up(e) and boy.right_pressed
+
+        def right_up_to_idle(e, boy=self):
+            return right_up(e) and (not boy.left_pressed)
+
+        def right_up_to_run(e, boy=self):
+            return right_up(e) and boy.left_pressed
 
         self.IDLE = Idle(self)
         self.Run = Run(self)
@@ -286,11 +302,23 @@ class Boy:
             self.IDLE,
             {
                 self.IDLE: {
-                    left_down: self.Run, right_down: self.Run, jump_key: self.Jump,
+                    left_down: self.Run,
+                    right_down: self.Run,
+                    jump_key: self.Jump,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Run: {
-                    left_down: self.IDLE, right_down: self.IDLE, left_up: self.IDLE, right_up: self.IDLE, jump_key: self.Jump,
+                    # 방향키를 누르면 계속 Run 유지 (방향만 변경)
+                    left_down: self.Run,
+                    right_down: self.Run,
+
+                    # 키를 뗐을 때: 다른 쪽 키 상태에 따라 Idle/Run 결정
+                    left_up_to_idle: self.IDLE,
+                    right_up_to_idle: self.IDLE,
+                    left_up_to_run: self.Run,
+                    right_up_to_run: self.Run,
+
+                    jump_key: self.Jump,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
                 self.Hit: {
@@ -298,14 +326,17 @@ class Boy:
                 },
 
                 self.Jump: {
-                    # 점프 중 피격
+                    land_to_run: self.Run,
+                    land_to_idle: self.IDLE,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit,
-                    # 착지 이벤트
                     (lambda e: e[0] == 'LAND'): self.IDLE
                 },
 
             }
         )
+
+
+
 
     def screen_xy(self):
         if self.camera:
@@ -316,7 +347,7 @@ class Boy:
     def update(self):
         self.state_machine.update()
         if self.camera and hasattr(self.camera, 'ground_y'):
-            if not self.in_air:  # 🔥 in_air 아닐 때만
+            if not self.in_air:
                 ground = self.camera.ground_y(self.x)
                 self.y = ground
         else:
@@ -330,10 +361,34 @@ class Boy:
 
     def handle_event(self, event):
         self.state_machine.handle_state_event(('INPUT', event))
-        if event.type == SDL_KEYDOWN and event.key == SDLK_UP:
-            self.up_pressed = True
-        elif event.type == SDL_KEYUP and event.key == SDLK_UP:
-            self.up_pressed = False
+        if event.type == SDL_KEYDOWN:
+            if event.key == SDLK_LEFT:
+                self.left_pressed = True
+                self.dir = -1
+                self.face_dir = -1
+            elif event.key == SDLK_RIGHT:
+                self.right_pressed = True
+                self.dir = 1
+                self.face_dir = 1
+            elif event.key == SDLK_UP:
+                self.up_pressed = True
+        elif event.type == SDL_KEYUP:
+            if event.key == SDLK_LEFT:
+                self.left_pressed = False
+                if self.right_pressed:
+                    self.dir = 1
+                    self.face_dir = 1
+                else:
+                    self.dir = 0
+            elif event.key == SDLK_RIGHT:
+                self.right_pressed = False
+                if self.left_pressed:
+                    self.dir = -1
+                    self.face_dir = -1
+                else:
+                    self.dir = 0
+            elif event.key == SDLK_UP:
+                self.up_pressed = False
 
 
     def draw(self):
