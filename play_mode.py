@@ -128,7 +128,7 @@ def load_map(name: str, entry: str = "default"):
     # 새 버섯 무작위 소환
     if data.get("spawn_monsters", False):
         width = data["width"]
-        cnt = random.randint(3, 6)
+        cnt = random.randint(5, 10)
         for _ in range(cnt):
             x = random.randint(0, width)
             y = field.ground_y(x) if hasattr(field, "ground_y") else 0

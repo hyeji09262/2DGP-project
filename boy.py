@@ -117,8 +117,8 @@ class Idle:
                                                0, 'h', sx, y,DW,DH)
 
 class Hit:
-    HIT_TIME = 1.0
-    IF_TIME = 0.5
+    HIT_TIME = 0.1
+    IF_TIME = 2.0
     KNOCK_PPS = 250
 
     W, H = 55, 80
@@ -438,8 +438,7 @@ class Boy:
         if self.if_timer > 0:
             return
 
-        self.if_timer = Hit.IF_TIME
-        IMPULSE = 20
+        IMPULSE = 5
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
 
