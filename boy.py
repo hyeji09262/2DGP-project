@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,delay , draw_rectangle)
 
 import game_framework
 from state_machine import StateMachine
@@ -11,6 +11,23 @@ RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 RUN_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
 
+ATTACK_A_FRAMES = [
+    (0,   470, 90, 80),
+    (95,  460, 65, 100),
+    (158, 470, 90, 80),
+    (252, 470, 90, 80),
+    (345, 470, 90, 80),
+    (434, 470, 90, 80),
+]
+
+ATTACK_B_FRAMES = [
+    (0,   280, 60, 100),
+    (65,  280, 60, 100),
+    (130, 280, 80, 100),
+    (213, 280, 80, 100),
+    (296, 280, 80, 100),
+    (379, 280, 80, 100),
+]
 
 def right_down(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_RIGHT
@@ -250,29 +267,31 @@ class Jump:
         self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx, y, DW, DH)
 
 class Attack:
-    DURATION = 0.35  # 전체 공격 모션 시간
+    DURATION = 1.0  # 전체 공격 모션 시간
     HIT_START = 0.10  # 이 시점부터
     HIT_END = 0.25  # 이 시점까지 공격 판정 활성
 
-    W, H = 70, 80
-    PITCH = 50
-    START_X = 0
-    START_Y = 470
+    FPS = 6
+    FRAMES_A = len(ATTACK_A_FRAMES)
+    FRAMES_B = len(ATTACK_B_FRAMES)
+
 
     def __init__(self, boy):
         self.boy = boy
         self.t = 0.0
         self.acc = 0.0
-        self.fps = 12.0
         self.f = 0
-
-
+        self.style = 0
 
     def enter(self, e):
         self.t = 0.0
         self.acc = 0.0
         self.f = 0
         self.boy.attack_active = False  # 공격 판정 OFF
+        self.style = self.boy.attack_style
+        self.boy.attack_style ^= 1
+
+        print("ATTACK style =", self.style, "next =", self.boy.attack_style)
 
 
     def exit(self, e):
@@ -287,32 +306,52 @@ class Attack:
         else:
             self.boy.attack_active = False
 
-        self.boy.x += self.boy.face_dir * RUN_SPEED_PPS * 0.15 * dt
+        self.boy.x += self.boy.face_dir * RUN_SPEED_PPS * 0.0 * dt
 
         self.acc += dt
-        step = 1.0 / self.fps
+        step = 1.0 / self.FPS
         while self.acc >= step:
             self.acc -= step
-            self.f = (self.f + 1) % 6
+            if self.style == 0:
+                self.f = (self.f + 1) % self.FRAMES_A
+            else:
+                self.f = (self.f + 1) % self.FRAMES_B
 
         if self.t >= self.DURATION:
             self.boy.attack_active = False
             self.boy.state_machine.handle_state_event(('END_ATTACK', 0))
 
     def draw(self):
-        W, H = self.W, self.H
-        left = self.START_X + (self.f % 4) * self.PITCH
-        bottom = self.START_Y
+
+        if self.style == 0:
+            frames = ATTACK_A_FRAMES
+        else:
+            frames = ATTACK_B_FRAMES
+
+        left_tex, bottom_tex, W, H,  = frames[self.f]
 
         sx, sy = self.boy.screen_xy()
 
         S = self.boy.scale
         DW, DH = int(W * S), int(H * S)
         foot_fix = (DH - H) // 2
-        y = sy - foot_fix - self.boy.foot_run_adj
+        base_y = sy - foot_fix - self.boy.foot_run_adj
+
+        if self.style == 0:  # A 모션
+            y = base_y - self.boy.foot_attack_a_adj
+        else:  # B 모션
+            y = base_y - self.boy.foot_attack_b_adj
 
         flip = '' if self.boy.face_dir == -1 else 'h'
-        self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx, y, DW, DH)
+        self.boy.image.clip_composite_draw(left_tex, bottom_tex, W, H, 0, flip, sx, y, DW, DH)
+        half_w = DW // 2
+        half_h = DH // 2
+        lx = sx - half_w  # left
+        bx = y - half_h  # bottom
+        rx = sx + half_w  # right
+        tx = y + half_h  # top
+
+        draw_rectangle(lx, bx, rx, tx)
 
 
 class Boy:
@@ -328,6 +367,8 @@ class Boy:
 
         self.foot_idle_adj = 36
         self.foot_run_adj = 36
+        self.foot_attack_a_adj = -5
+        self.foot_attack_b_adj = -10
 
         self.x, self.y = 500, 340
         self.base_ground_y = self.y
