@@ -11,23 +11,6 @@ RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 RUN_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
 
-ATTACK_A_FRAMES = [
-    (0,   470, 90, 80),
-    (95,  460, 65, 100),
-    (158, 470, 90, 80),
-    (252, 470, 90, 80),
-    (345, 470, 90, 80),
-    (434, 470, 90, 80),
-]
-
-ATTACK_B_FRAMES = [
-    (0,   280, 60, 100),
-    (65,  280, 60, 100),
-    (130, 280, 80, 100),
-    (213, 280, 80, 100),
-    (296, 280, 80, 100),
-    (379, 280, 80, 100),
-]
 
 def right_down(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_RIGHT
@@ -226,13 +209,15 @@ class Jump:
             self.hdir = 0
 
     def exit(self, e):
-        self.boy.in_air = False
-        self.vy = 0.0
+        if isinstance(e, tuple) and e[0] == 'LAND':
+            self.boy.in_air = False
+            self.vy = 0.0
 
     def do(self):
         dt = game_framework.frame_time
         self.vy -= self.GRAVITY_PPS * dt
         self.boy.y += self.vy * dt
+        self.boy.air_vy = self.vy
         self.boy.x += self.hdir * RUN_SPEED_PPS * self.MOVE_RATIO * dt
         self.boy.frame = (self.boy.frame + 1) % 1
 
@@ -243,6 +228,9 @@ class Jump:
 
         if self.boy.y <= ground_y:
             self.boy.y = ground_y
+            self.boy.in_air = False
+            self.vy = 0.0
+            self.boy.air_vy = 0.0
             self.boy.state_machine.handle_state_event(('LAND', 0))
             return
 
@@ -266,7 +254,26 @@ class Jump:
         flip = '' if self.boy.face_dir == -1 else 'h'
         self.boy.image.clip_composite_draw(left, bottom, W, H, 0, flip, sx, y, DW, DH)
 
+ATTACK_A_FRAMES = [
+    (0,   470, 90, 80),
+    (95,  460, 65, 100),
+    (158, 470, 90, 80),
+    (252, 470, 90, 80),
+    (345, 470, 90, 80),
+    (434, 470, 91, 80),
+]
+
+ATTACK_B_FRAMES = [
+    (0,   280, 60, 100),
+    (65,  280, 60, 100),
+    (130, 280, 84, 100),
+    (213, 280, 84, 100),
+    (296, 280, 84, 100),
+    (379, 280, 85, 100),
+]
+
 class Attack:
+
     DURATION = 1.0  # 전체 공격 모션 시간
     HIT_START = 0.10  # 이 시점부터
     HIT_END = 0.25  # 이 시점까지 공격 판정 활성
@@ -282,6 +289,8 @@ class Attack:
         self.acc = 0.0
         self.f = 0
         self.style = 0
+        self.air_attack = False
+        self.vy = 0.0
 
     def enter(self, e):
         self.t = 0.0
@@ -291,7 +300,12 @@ class Attack:
         self.style = self.boy.attack_style
         self.boy.attack_style ^= 1
 
-        print("ATTACK style =", self.style, "next =", self.boy.attack_style)
+        self.air_attack = self.boy.in_air
+
+        if self.air_attack:
+            self.vy = 0.0
+        else:
+            self.vy = 0.0
 
 
     def exit(self, e):
@@ -300,6 +314,24 @@ class Attack:
     def do(self):
         dt = game_framework.frame_time
         self.t += dt
+
+        if self.air_attack:
+            self.vy -= Jump.GRAVITY_PPS * dt
+            self.boy.y += self.vy * dt
+
+            self.boy.air_vy = self.vy
+
+            if self.boy.camera and hasattr(self.boy.camera, 'ground_y'):
+                ground_y = self.boy.camera.ground_y(self.boy.x)
+            else:
+                ground_y = self.boy.base_ground_y
+
+            if self.boy.y <= ground_y:
+                self.boy.y = ground_y
+                self.boy.in_air = False
+                self.air_attack = False
+                self.vy = 0.0
+                self.boy.air_vy = 0.0
 
         if self.HIT_START <= self.t <= self.HIT_END:
             self.boy.attack_active = True
@@ -448,6 +480,7 @@ class Boy:
                 self.Jump: {
                     land_to_run: self.Run,
                     land_to_idle: self.IDLE,
+                    attack_key: self.Attack,
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit,
                     (lambda e: e[0] == 'LAND'): self.IDLE
                 },
