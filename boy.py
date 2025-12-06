@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,delay , draw_rectangle)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT,delay , draw_rectangle)
 
 import game_framework
 from state_machine import StateMachine
@@ -21,9 +21,9 @@ def left_down(e):
 def left_up(e):
     return e[0] == 'INPUT' and e[1].type == SDL_KEYUP and e[1].key == SDLK_LEFT
 def jump_key(e):
-    return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_LCTRL
+    return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_LALT
 def attack_key(e):
-    return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_z
+    return e[0] == 'INPUT' and e[1].type == SDL_KEYDOWN and e[1].key == SDLK_LCTRL
 
 class Run:
     def __init__(self, boy):
@@ -401,6 +401,7 @@ class Boy:
         self.foot_run_adj = 36
         self.foot_attack_a_adj = -5
         self.foot_attack_b_adj = -10
+
 
         self.x, self.y = 500, 340
         self.base_ground_y = self.y

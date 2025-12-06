@@ -212,18 +212,37 @@ def init():
 
 
 def _handle_collisions():
-    if getattr(boy, 'if_timer', 0) > 0:  # 전환 직후 충돌 스킵
-        return
-    bb_b = boy.get_bb()
-    for layer in game_world.world:
-        for o in layer:
-            if o.__class__.__name__ != 'Mushroom':
+    # 1) 몬스터 → 플레이어 (플레이어가 맞는 쪽)
+    if getattr(boy, 'if_timer', 0) <= 0:   # 무적 아닐 때만
+        bb_b = boy.get_bb()
+        for m in _gather_monsters():
+            # 죽었거나 죽는 중인 몬스터는 무시
+            if getattr(m, 'dead', False):
+                continue
+            if getattr(m, 'state', None) == 'die':
                 continue
 
-            if _overlap(bb_b, o.get_bb()):
-                from_dir = 1 if (o.x > boy.x) else -1
+            if _overlap(bb_b, m.get_bb()):
+                from_dir = 1 if (m.x > boy.x) else -1
                 boy.take_hit(from_dir)
+                # 한 번 맞으면 끝
                 return
+
+    # 2) 플레이어 공격 → 몬스터 피격
+    if getattr(boy, 'attack_active', False):
+        atk_bb = boy.get_attack_bb()
+        for m in _gather_monsters():
+            if getattr(m, 'dead', False):
+                continue
+
+            # 🔥 방금 맞은 몬스터는 이번 프레임(또는 짧은 시간) 동안 무시
+            if getattr(m, 'hit_cool', 0) > 0:
+                continue
+
+            if _overlap(atk_bb, m.get_bb()):
+                m.take_hit(damage=1, from_dir=boy.face_dir)
+                m.hit_cool = 0.3
+
 
 def update():
     global _collision_grace
@@ -240,6 +259,11 @@ def update():
 
     _keep_boy_in_world()
     _handle_collisions()
+
+    for layer in game_world.world:
+        for o in list(layer):  # 복사본 돌면서 제거해야 안전
+            if isinstance(o, Mushroom) and getattr(o, 'dead', False):
+                game_world.remove_object(o)
 
 
 def draw():
