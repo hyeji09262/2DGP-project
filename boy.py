@@ -385,10 +385,72 @@ class Attack:
 
         draw_rectangle(lx, bx, rx, tx)
 
+class Die:
+    FPS = 6.0
+    DURATION = 1.0
+
+    FRAMES = [
+        # TODO: 네 스프라이트 시트에 맞게 직접 숫자 채우기
+        # 예시:
+        # (0,   190, 55, 80),
+        # (60,  190, 55, 80),
+        # (120, 190, 55, 80),
+    ]
+
+    def __init__(self, boy):
+        self.boy = boy
+        self.acc = 0.0
+        self.t = 0.0
+        self.f = 0
+
+    def enter(self, e):
+        # 죽을 때는 움직임 정지
+        self.boy.dir = 0
+        self.acc = 0.0
+        self.t = 0.0
+        self.f = 0
+
+    def exit(self, e):
+        pass
+
+    def do(self):
+        dt = game_framework.frame_time
+        self.t += dt
+        self.acc += dt
+
+        # 프레임 넘기기
+        step = 1.0 / self.FPS
+        while self.acc >= step:
+            self.acc -= step
+            if self.f < len(self.FRAMES) - 1:
+                self.f += 1
+
+        if self.t >= self.DURATION:
+            self.boy.alive = False  # 이 뒤로는 입력/업데이트 안 받게 쓸 수 있음
+
+    def draw(self):
+        if not self.FRAMES:
+            return  # 아직 프레임 숫자 안 채웠으면 그냥 안 그림
+
+        left, bottom, W, H = self.FRAMES[self.f]
+
+        sx, sy = self.boy.screen_xy()
+        S = self.boy.scale
+        DW, DH = int(W * S), int(H * S)
+
+        foot_fix = (DH - H) // 2
+        y = sy - foot_fix - self.boy.foot_idle_adj
+
+        flip = '' if self.boy.face_dir == -1 else 'h'
+        self.boy.image.clip_composite_draw(left, bottom, W, H,
+                                           0, flip, sx, y, DW, DH)
+
 
 class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
+        self.image = load_image('사진수집/character/캐릭터 3.png')
+        self.die_image = load_image('사진수집/etc/무덤.png')
 
         self.scale = 1.2
         self.bb_offset_y = 40
@@ -402,6 +464,9 @@ class Boy:
         self.foot_attack_a_adj = -5
         self.foot_attack_b_adj = -10
 
+        self.max_hp = 5  # 총 HP (원하면 숫자 조정)
+        self.hp = self.max_hp
+        self.alive = True
 
         self.x, self.y = 500, 340
         self.base_ground_y = self.y
@@ -412,7 +477,6 @@ class Boy:
         self.dir = 0
         self.velocity = 0
         self.size = 1.0
-        self.image = load_image('사진수집/character/캐릭터 3.png')
         self.camera = None
         self.up_pressed = False
         self.left_pressed = False
@@ -448,6 +512,7 @@ class Boy:
         self.Run = Run(self)
         self.Jump = Jump(self)
         self.Attack = Attack(self)
+        self.Die = Die(self)
 
         self.state_machine = StateMachine(
             self.IDLE,
@@ -490,6 +555,9 @@ class Boy:
                     attack_end_to_idle: self.IDLE,  # 공격 끝 + 방향키 없음 → Idle
                     (lambda e: e[0] == 'TAKE_HIT'): self.Hit
                 },
+                self.Die: {
+                    # 죽은 상태에선 다른 상태로 안 돌아감
+                }
 
             }
         )
@@ -504,6 +572,10 @@ class Boy:
 
 
     def update(self):
+        if not self.alive:
+            self.state_machine.update()
+            return
+
         self.state_machine.update()
         if self.camera and hasattr(self.camera, 'ground_y'):
             if not self.in_air:
@@ -519,6 +591,9 @@ class Boy:
                 self.if_timer = 0.0
 
     def handle_event(self, event):
+        if not self.alive:
+            return
+
         self.state_machine.handle_state_event(('INPUT', event))
         if event.type == SDL_KEYDOWN:
             if event.key == SDLK_LEFT:
@@ -550,6 +625,8 @@ class Boy:
                 self.up_pressed = False
 
 
+
+
     def draw(self):
         flicker = (self.if_timer > 0.0) and ((int(get_time() * 10) % 2) == 0)
 
@@ -566,6 +643,8 @@ class Boy:
                 self.image.opacify(1.0)
             except:
                 pass
+
+        self.font.draw(20, 560, f'HP: {self.hp}/{self.max_hp}', (255, 0, 0))
 
 
     def set_camera(self, cam):
@@ -607,10 +686,25 @@ class Boy:
 
 
     def take_hit(self, from_dir: int):
-        if self.if_timer > 0:
+        if self.if_timer > 0 or not self.alive:
             return
 
-        IMPULSE = 5
+        self.hp -= 1
+        print("PLAYER HIT! hp =", self.hp)
+
+        if self.hp <= 0:
+            # 완전히 죽음
+            self.alive = False
+            # 넉백은 한 번만 가볍게 줄 수도 있고 안 줘도 됨
+            IMPULSE = 20
+            knock_dir = -1 if from_dir > 0 else 1
+            self.x += knock_dir * IMPULSE
+
+            self.state_machine.handle_state_event(('DIE', from_dir))
+            return
+
+        self.if_timer = 0.5
+        IMPULSE = 20
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
 
