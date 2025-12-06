@@ -19,6 +19,14 @@ DRAW_HITBOX = True
 _collision_grace = 0.0
 COLLIDE_IGNORE_PROB = 0.8
 
+DROP_TABLE = [
+    ('10원',   0.3),
+    ('100원', 0.2),
+    ('1000원',    0.15),
+    ('5000원',    0.05),
+    ('주황버섯의 갓',   0.3),
+]
+
 MAPS = {
     "henesys": {
         "image": "사진수집/background/헤네시스.png",
@@ -166,6 +174,16 @@ def _gather_items():
                 res.append(o)
     return res
 
+def _choose_drop_kind():
+    r = random.random()   # 0.0 ~ 1.0
+    acc = 0.0
+    for kind, p in DROP_TABLE:
+        acc += p
+        if r < acc:
+            return kind
+    # 혹시 합이 1.0이 안 맞아도 마지막 거 반환
+    return DROP_TABLE[-1][0]
+
 def _keep_boy_in_world():
     if not field:
         return
@@ -287,16 +305,18 @@ def update():
     _handle_item_pickup()
 
     for layer in game_world.world:
-        for o in list(layer):  # 복사본 돌면서 제거
+        for o in list(layer):
             if isinstance(o, Mushroom) and getattr(o, 'dead', False):
-                drop_x, drop_y = o.x, o.y + 20
 
-                # 아이템 생성
-                item = DropItem(drop_x, drop_y, field=field, kind='coin')
-                game_world.add_object(item, 1)  # 몬스터랑 같은 레이어 정도
-                items.append(item)
+                if random.random() < 0.7:  # 70% 확률로만 드랍, 30%는 그냥 안 줌
+                    drop_x = o.x
+                    drop_y = o.y + 20
 
-                # 몬스터 제거
+                    kind = _choose_drop_kind()  # ← 여기서 확률로 10원/100원/1000원... 뽑힘
+                    item = DropItem(drop_x, drop_y, field=field, kind=kind)
+                    game_world.add_object(item, 1)
+                    items.append(item)
+
                 game_world.remove_object(o)
 
 

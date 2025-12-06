@@ -6,23 +6,27 @@ GRAVITY_PPS = 1500.0
 ITEM_IMAGES = {
     '10원':   '사진수집/etc/동.png',
     '100원': '사진수집/etc/금.png',
-    '1000원':    '사진수집/etc/지폐.png',
+    '1000원':    '사진수집/etc/지페.png',
     '5000원':    '사진수집/etc/다발.png',
     '주황버섯의 갓':   '사진수집/etc/주황버섯의 갓.png',
-    # 실제 파일 이름에 맞게 고쳐줘
 }
 
 
 class DropItem:
-    def __init__(self, x, y, field=None, kind='coin'):
+    def __init__(self, x, y, field=None, kind='주황버섯의 갓'):
         self.x, self.y = x, y
         self.vy = 300.0          # 처음 위로 살짝 튀어오르게
         self.kind = kind
         self.scale = 1.0
         self.collected = False
 
-        # TODO: 여기서 실제 아이템 이미지로 바꾸기
-        self.image = load_image('사진수집/etc/돈.png')
+        self.scale = 0.2
+
+        path = ITEM_IMAGES.get(kind, ITEM_IMAGES['주황버섯의 갓'])
+        self.image = load_image(path)
+
+        base = max(self.image.w, self.image.h) * self.scale
+        self.bb_r = int(base * 0.3)
 
         self.camera = None
         if field:
@@ -54,7 +58,14 @@ class DropItem:
 
     def draw(self):
         sx, sy = self.screen_xy()
-        self.image.draw(sx, sy)
+        S = self.scale
+
+        w = int(self.image.w * S)
+        h = int(self.image.h * S)
+
+        self.image.draw(sx, sy, w, h)
+
+        print("DRAW ITEM", self.kind, "scale=", self.scale)
 
     def get_bb(self):
         r = self.bb_r

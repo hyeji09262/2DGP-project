@@ -61,7 +61,7 @@ class Mushroom:
 
         # 상태 / 체력
         self.state = 'run'
-        self.hp = 3
+        self.hp = 1
         self.dead = False
 
         # 피격 넉백
