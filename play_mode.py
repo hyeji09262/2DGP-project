@@ -7,12 +7,14 @@ import game_world
 from boy import Boy
 from field import Field
 from monster import Mushroom
+from item import DropItem
 
 field = None
 boy = None
 current_map = None
 _transition_cooldown = 0.0
 monsters = []
+items = []
 DRAW_HITBOX = True
 _collision_grace = 0.0
 COLLIDE_IGNORE_PROB = 0.8
@@ -156,6 +158,14 @@ def _gather_monsters():
                 mons.append(o)
     return mons
 
+def _gather_items():
+    res = []
+    for layer in game_world.world:
+        for o in layer:
+            if o.__class__.__name__ == 'DropItem':
+                res.append(o)
+    return res
+
 def _keep_boy_in_world():
     if not field:
         return
@@ -245,7 +255,19 @@ def _handle_collisions():
             if _overlap(atk_bb, m.get_bb()):
                 m.take_hit(damage=1, from_dir=boy.face_dir)
                 m.hit_cool = 0.3
+def _handle_item_pickup():
+    bb_boy = boy.get_bb()
+    for it in list(_gather_items()):
+        if _overlap(bb_boy, it.get_bb()):
+            if boy.hp < boy.max_hp:
+                boy.hp += 1
+            print("ITEM PICKED!")
 
+            for layer in game_world.world:
+                if it in layer:
+                    layer.remove(it)
+            if it in items:
+                items.remove(it)
 
 def update():
     global _collision_grace
@@ -262,10 +284,19 @@ def update():
 
     _keep_boy_in_world()
     _handle_collisions()
+    _handle_item_pickup()
 
     for layer in game_world.world:
-        for o in list(layer):  # 복사본 돌면서 제거해야 안전
+        for o in list(layer):  # 복사본 돌면서 제거
             if isinstance(o, Mushroom) and getattr(o, 'dead', False):
+                drop_x, drop_y = o.x, o.y + 20
+
+                # 아이템 생성
+                item = DropItem(drop_x, drop_y, field=field, kind='coin')
+                game_world.add_object(item, 1)  # 몬스터랑 같은 레이어 정도
+                items.append(item)
+
+                # 몬스터 제거
                 game_world.remove_object(o)
 
 
@@ -284,6 +315,12 @@ def draw():
         # 몬스터 박스
         for m in _gather_monsters():
             l, b, r, t = m.get_bb()
+            sx0, sy0 = field.world_to_screen(l, b)
+            sx1, sy1 = field.world_to_screen(r, t)
+            draw_rectangle(sx0, sy0, sx1, sy1)
+
+        for it in _gather_items():
+            l, b, r, t = it.get_bb()
             sx0, sy0 = field.world_to_screen(l, b)
             sx1, sy1 = field.world_to_screen(r, t)
             draw_rectangle(sx0, sy0, sx1, sy1)

@@ -402,7 +402,6 @@ class Die:
         self.acc = 0.0
         self.t = 0.0
         self.f = 0
-        self.size = 1.5
 
     def exit(self, e):
         pass
@@ -458,7 +457,7 @@ class Boy:
         self.foot_attack_a_adj = -5
         self.foot_attack_b_adj = -10
 
-        self.max_hp = 5  # 총 HP (원하면 숫자 조정)
+        self.max_hp = 100  # 총 HP (원하면 숫자 조정)
         self.hp = self.max_hp
         self.alive = True
 
@@ -674,8 +673,6 @@ class Boy:
 
             flip = '' if self.face_dir == -1 else 'h'
 
-            # 🔥 여기서 그냥 self.image 를 쓰고 있음
-            #   (죽는 전용 이미지 쓰고 싶으면 self.die_image 로 교체)
             self.die_image.clip_composite_draw(
                 left, bottom, W, H,
                 0, flip,
