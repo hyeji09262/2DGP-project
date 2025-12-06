@@ -212,6 +212,9 @@ def init():
 
 
 def _handle_collisions():
+    if hasattr(boy, 'alive') and not boy.alive:
+        return
+
     # 1) 몬스터 → 플레이어 (플레이어가 맞는 쪽)
     if getattr(boy, 'if_timer', 0) <= 0:   # 무적 아닐 때만
         bb_b = boy.get_bb()
@@ -224,8 +227,8 @@ def _handle_collisions():
 
             if _overlap(bb_b, m.get_bb()):
                 from_dir = 1 if (m.x > boy.x) else -1
-                boy.take_hit(from_dir)
-                # 한 번 맞으면 끝
+                damage = getattr(m, 'contact_damage', 1)
+                boy.take_hit(from_dir, damage=damage)
                 return
 
     # 2) 플레이어 공격 → 몬스터 피격

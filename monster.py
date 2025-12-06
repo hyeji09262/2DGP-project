@@ -69,6 +69,8 @@ class Mushroom:
         self.hit_back_speed = 200.0
         self.hit_cool = 0.0
 
+        self.contact_damage = 2
+
     # 카메라(필드) 연결
     def set_camera(self, cam):
         self.camera = cam

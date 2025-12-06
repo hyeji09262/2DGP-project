@@ -389,13 +389,6 @@ class Die:
     FPS = 6.0
     DURATION = 1.0
 
-    FRAMES = [
-        # TODO: 네 스프라이트 시트에 맞게 직접 숫자 채우기
-        # 예시:
-        # (0,   190, 55, 80),
-        # (60,  190, 55, 80),
-        # (120, 190, 55, 80),
-    ]
 
     def __init__(self, boy):
         self.boy = boy
@@ -409,6 +402,7 @@ class Die:
         self.acc = 0.0
         self.t = 0.0
         self.f = 0
+        self.size = 1.5
 
     def exit(self, e):
         pass
@@ -442,8 +436,8 @@ class Die:
         y = sy - foot_fix - self.boy.foot_idle_adj
 
         flip = '' if self.boy.face_dir == -1 else 'h'
-        self.boy.image.clip_composite_draw(left, bottom, W, H,
-                                           0, flip, sx, y, DW, DH)
+        self.boy.die_image.clip_composite_draw(
+            left, bottom, W, H,0, flip,sx, y, DW, DH)
 
 
 class Boy:
@@ -562,6 +556,16 @@ class Boy:
             }
         )
 
+    DIE_FRAMES = [
+        (6, 56, 85, 43),
+        (100, 54, 85, 47),
+        (195, 54, 89, 44),
+        (305, 54, 94, 44),
+        (454, 54, 51, 43),
+        (570, 54, 47, 44),
+    ]
+    DIE_FPS = 6.0  # 1초에 6프레임 정도
+    DIE_LOOP = False
 
 
 
@@ -572,23 +576,36 @@ class Boy:
 
 
     def update(self):
+
         if not self.alive:
-            self.state_machine.update()
+            dt = game_framework.frame_time
+            self.dead_anim_t += dt
+
+            if self.camera and hasattr(self.camera, 'ground_y'):
+                self.y = self.camera.ground_y(self.x)
+
+                # 죽는 애니 끝났는지 체크 (원하면 나중에 사용)
+            total_frames = len(self.DIE_FRAMES)
+            if not self.DIE_LOOP:
+                max_t = total_frames / self.DIE_FPS
+                if self.dead_anim_t >= max_t:
+                    self.dead_anim_t = max_t
+                    self.dead_anim_done = True
+
             return
 
         self.state_machine.update()
+
         if self.camera and hasattr(self.camera, 'ground_y'):
-            if not self.in_air:
+            if not getattr(self, 'in_air', False):
                 ground = self.camera.ground_y(self.x)
                 self.y = ground
-        else:
-            if not self.in_air:
-                self.y = self.base_ground_y
 
         if self.if_timer > 0:
             self.if_timer -= game_framework.frame_time
             if self.if_timer < 0:
                 self.if_timer = 0.0
+
 
     def handle_event(self, event):
         if not self.alive:
@@ -628,6 +645,44 @@ class Boy:
 
 
     def draw(self):
+        if not self.alive:
+            sx, sy = self.screen_xy()
+
+            # 죽는 애니 프레임 계산
+            frames = self.DIE_FRAMES  # [(left,bottom,w,h), ...]
+            if not frames:
+                # 프레임 아직 안 잡았으면 일단 통짜로 그리기
+                self.die_image.draw(sx, sy)
+                return# 프레임 정의 아직 안 했으면 그냥 안 그림
+
+            index = int(self.dead_anim_t * self.DIE_FPS)
+
+            if self.DIE_LOOP:
+                index = index % len(frames)
+            else:
+                if index >= len(frames):
+                    index = len(frames) - 1
+
+            left, bottom, W, H = frames[index]
+
+            sx, sy = self.screen_xy()
+            S = self.scale
+            DW, DH = int(W * S), int(H * S)
+
+            foot_fix = (DH - H) // 2
+            y = sy - foot_fix - self.foot_idle_adj
+
+            flip = '' if self.face_dir == -1 else 'h'
+
+            # 🔥 여기서 그냥 self.image 를 쓰고 있음
+            #   (죽는 전용 이미지 쓰고 싶으면 self.die_image 로 교체)
+            self.die_image.clip_composite_draw(
+                left, bottom, W, H,
+                0, flip,
+                sx, y, DW, DH
+            )
+            return
+
         flicker = (self.if_timer > 0.0) and ((int(get_time() * 10) % 2) == 0)
 
         if flicker:
@@ -656,6 +711,9 @@ class Boy:
         return self.x, self.y
 
     def get_bb(self):
+        if hasattr(self, 'alive') and not self.alive:
+            return (0, 0, 0, 0)
+
         W, H = 35, 60
         S = getattr(self, 'scale', 1.0)
 
@@ -684,13 +742,25 @@ class Boy:
         else:
             return (bx0 - reach, ay0, bx0, ay1)
 
-
-    def take_hit(self, from_dir: int):
+    def take_hit(self, from_dir: int, damage: int = 1):
         if self.if_timer > 0 or not self.alive:
             return
 
-        self.hp -= 1
-        print("PLAYER HIT! hp =", self.hp)
+        self.hp -= damage
+        print(f"PLAYER HIT! damage={damage}, hp={self.hp}")
+
+        if self.hp <= 0:
+            self.hp = 0
+            self.alive = False  # 더 이상 살아있지 않음
+            self.dead_anim_t = 0.0  # 죽는 애니 시간 리셋
+            self.dead_anim_done = False
+
+            IMPULSE = 20
+            knock_dir = -1 if from_dir > 0 else 1
+            self.x += knock_dir * IMPULSE
+
+            # 🔥 상태머신에 DIE 이벤트 안 보내고 여기서 끝!
+            return
 
         if self.hp <= 0:
             # 완전히 죽음
