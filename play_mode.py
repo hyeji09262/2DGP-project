@@ -275,17 +275,17 @@ def _handle_collisions():
                 m.hit_cool = 0.3
 def _handle_item_pickup():
     bb_boy = boy.get_bb()
+    picking = getattr(boy, 'pick_pressed', False)
+    if not picking:
+        return
+
     for it in list(_gather_items()):
         if _overlap(bb_boy, it.get_bb()):
             if boy.hp < boy.max_hp:
                 boy.hp += 1
             print("ITEM PICKED!")
 
-            for layer in game_world.world:
-                if it in layer:
-                    layer.remove(it)
-            if it in items:
-                items.remove(it)
+
 
 def update():
     global _collision_grace

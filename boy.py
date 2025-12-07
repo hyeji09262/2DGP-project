@@ -474,8 +474,17 @@ class Boy:
         self.up_pressed = False
         self.left_pressed = False
         self.right_pressed = False
+        self.pick_pressed = False
         self.attack_active = False
         self.attack_style = 0
+
+        self.inventory = {
+            '10원': 0,
+            '100원': 0,
+            '1000원': 0,
+            '5000원': 0,
+            '주황버섯의 갓': 0,
+        }
 
         def land_to_run(e, boy=self):
             return (e[0] == 'LAND') and (boy.left_pressed or boy.right_pressed)
@@ -622,6 +631,10 @@ class Boy:
                 self.face_dir = 1
             elif event.key == SDLK_UP:
                 self.up_pressed = True
+
+            elif event.key == SDLK_z:
+                self.pick_pressed = True
+
         elif event.type == SDL_KEYUP:
             if event.key == SDLK_LEFT:
                 self.left_pressed = False
@@ -639,6 +652,9 @@ class Boy:
                     self.dir = 0
             elif event.key == SDLK_UP:
                 self.up_pressed = False
+
+            elif event.key == SDLK_z:
+                self.pick_pressed = False
 
 
 
@@ -776,3 +792,12 @@ class Boy:
         self.x += knock_dir * IMPULSE
 
         self.state_machine.handle_state_event(('TAKE_HIT', from_dir))
+
+    def obtain_item(self, kind: str):
+        """드랍템을 주웠을 때 호출 (인벤토리에 기록)"""
+        if kind in self.inventory:
+            self.inventory[kind] += 1
+        else:
+            self.inventory[kind] = 1
+
+        print(f"OBTAIN ITEM: {kind}, now have {self.inventory[kind]}")
