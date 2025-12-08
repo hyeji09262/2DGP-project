@@ -29,10 +29,10 @@ class Mushroom:
 
     DIE_FRAMES = [
         (240, 25, 130, 102),
-        (380, 25, 120, 100),
+        (387, 25, 110, 100),
         (490, 25, 120, 100),
     ]
-    FPS_DIE = 8.0
+    FPS_DIE = 10
 
     FRAME_SCALE = 0.8
     FOOT_ADJ_RUN = 45
@@ -64,7 +64,7 @@ class Mushroom:
 
         # 상태 / 체력
         self.state = 'run'
-        self.hp = 50
+        self.hp = 1
         self.dead = False
 
         # 피격 넉백

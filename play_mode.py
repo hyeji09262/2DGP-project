@@ -33,6 +33,12 @@ menu_rect_inven = None     # I : 인벤토리
 menu_rect_hotkey = None    # O : 단축키 정보
 menu_rect_weapon = None    # P : 무기 강화
 menu_rect_exit = None      # 종료 버튼
+DRAW_MENU_BOUNDS = True
+
+char_x_rect = None
+inven_x_rect = None
+hotkey_x_rect = None
+weapon_x_rect = None
 
 # 각 서브창(다음 화면) 열림 여부
 ui_char_open = False       # U
@@ -145,24 +151,33 @@ def _init_menu_layout():
     y1 = y0 + h
     menu_rect_main = (x0, y0, x1, y1)
 
-    close_w = int(w * 0.09)  # 대략적인 비율
+    close_w = int(w *  0.06)  # 대략적인 비율
     close_h = close_w
-    cx1 = x1 - int(w * 0.06)
-    cy1 = y1 - int(h * 0.06)
+    cx1 = x1 - int(w * 0.2)
+    cy1 = y1 - int(h * 0.19)
     cx0 = cx1 - close_w
     cy0 = cy1 - close_h
     menu_rect_close = (cx0, cy0, cx1, cy1)
 
     # 네 개 큰 버튼(캐릭터/U, 인벤/I, 단축키/O, 무기강화/P)
-    btn_w = int(w * 0.36)
-    btn_h = int(h * 0.22)
+    btn_w = int(w * 0.2)
+    btn_h = int(h * 0.25)
 
     # 좌우 열 중심
-    left_cx = x0 + int(w * 0.30)
-    right_cx = x0 + int(w * 0.70)
+    left_cx = x0 + int(w * 0.33)
+    right_cx = x0 + int(w * 0.58)
 
-    top_cy = y0 + int(h * 0.63)
+    top_cy = y0 + int(h * 0.55)
     bottom_cy = y0 + int(h * 0.35)
+
+    # 게임 종료 버튼 (오른쪽 아래)
+    exit_w = int(w *0.1)
+    exit_h = int(h * 0.1)
+    ex1 = x1 - int(w * 0.2)
+    ey0 = y0 + int(h * 0.2)
+    ex0 = ex1 - exit_w
+    ey1 = ey0 + exit_h
+    menu_rect_exit = (ex0, ey0, ex1, ey1)
 
     def make_rect(cx, cy):
         hw = btn_w // 2
@@ -174,14 +189,6 @@ def _init_menu_layout():
     menu_rect_hotkey = make_rect(left_cx, bottom_cy)  # O : 단축키 정보
     menu_rect_weapon = make_rect(right_cx, bottom_cy)  # P : 무기 강화
 
-    # 게임 종료 버튼 (오른쪽 아래)
-    exit_w = int(w * 0.22)
-    exit_h = int(h * 0.15)
-    ex1 = x1 - int(w * 0.06)
-    ey0 = y0 + int(h * 0.08)
-    ex0 = ex1 - exit_w
-    ey1 = ey0 + exit_h
-    menu_rect_exit = (ex0, ey0, ex1, ey1)
 
 
 def init():
@@ -210,12 +217,16 @@ def init():
 
     _init_menu_layout()
 
+def _canvas_mouse_xy(event):
+    h = get_canvas_height()
+    return event.x, h - event.y - 1
+
 def _handle_menu_event(event):
     global menu_open, ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open
 
     # 마우스 왼쪽 클릭만 처리
     if event.type == SDL_MOUSEBUTTONDOWN and event.button == SDL_BUTTON_LEFT:
-        mx, my = event.x, event.y
+        mx, my = _canvas_mouse_xy(event)
         # print("[MENU] mouse click:", mx, my)
 
         # X 버튼 클릭 → 메뉴 닫기
@@ -258,7 +269,7 @@ def _handle_menu_event(event):
 
         # '게임 종료' 버튼 클릭
         if _in_rect(mx, my, menu_rect_exit):
-            print("[MENU] 게임 종료 클릭 → game_framework.quit()")
+            print("[MENU] 게임 종료 버튼 클릭 → game_framework.quit()")
             game_framework.quit()
             return
 
@@ -488,10 +499,21 @@ def handle_events():
                 # boy.handle_event 로 넘기지 않음
             continue
 
+        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
+            _handle_subwindow_mouse(event)
+            # 서브창이 열려 있으면 게임 조작(boy.handle_event)은 막음
+            continue
+
         # ====== 메뉴가 열려 있을 때 마우스 처리 (나중에 버튼 클릭용) ======
         if menu_open:
             _handle_menu_event(event)
             continue
+
+        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
+            _handle_subwindow_mouse(event)
+                # 여기서는 캐릭터 움직임 같은 건 막고 UI만 처리
+            continue
+
 
             # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
         boy.handle_event(event)
@@ -629,6 +651,7 @@ def draw():
         scaled_w = int(menu_img.w * MENU_SCALE)
         scaled_h = int(menu_img.h * MENU_SCALE)
         menu_img.draw(cw // 2, ch // 2, scaled_w, scaled_h)
+        _draw_menu_bounds()
 
     _draw_subwindows()
 
@@ -700,6 +723,8 @@ def _draw_boy_portrait(px, py):
                                   px, y, DW, DH)
 
 def _draw_char_window():
+    global char_x_rect
+
     if not ui_char_open:
         return
 
@@ -724,6 +749,15 @@ def _draw_char_window():
 
     # 패널 이미지 그리기
     char_panel_img.draw(cx, cy, w, h)
+
+    x1 = panel_left + w - int(w * 0.2)  # 오른쪽에서 4% 안쪽
+    y1 = panel_bottom + h - int(h * 0.19)  # 위에서 5% 아래
+    x0 = x1 - int(w * 0.06)  # X 버튼 폭 : w * 6%
+    y0 = y1 - int(h * 0.10)  # X 버튼 높이 : h * 10%
+    char_x_rect = (x0, y0, x1, y1)
+
+    if DRAW_MENU_BOUNDS:
+        draw_rectangle(*char_x_rect)
 
     # -----------------------
     # 1) 왼쪽 초상화 (그림 박스 안 중앙쯤)
@@ -769,6 +803,8 @@ def _draw_char_window():
     font.draw(num_x, attack_y, atk_s, (0, 0, 0))
 
 def _draw_inventory_window():
+    global inven_x_rect
+
     if not ui_inven_open:
         return
 
@@ -791,6 +827,15 @@ def _draw_inventory_window():
 
         # 패널 이미지 그리기
     inven_panel_img.draw(cx, cy, w, h)
+
+    x1 = panel_left + w - int(w * 0.15)
+    y1 = panel_bottom + h - int(h * 0.08)
+    x0 = x1 - int(w * 0.07)
+    y0 = y1 - int(h * 0.05)
+    inven_x_rect = (x0, y0, x1, y1)
+
+    if DRAW_MENU_BOUNDS:
+        draw_rectangle(*inven_x_rect)
 
         # ==========================
         # 1) 인벤 아이템 그리드
@@ -866,6 +911,8 @@ def _draw_inventory_window():
     font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (255, 200, 0))
 
 def _draw_hotkey_window():
+    global hotkey_x_rect
+
     if not ui_hotkey_open:
         return
 
@@ -883,8 +930,19 @@ def _draw_hotkey_window():
     w = int(hotkey_panel_img.w * HOTKEY_PANEL_SCALE)
     h = int(hotkey_panel_img.h * HOTKEY_PANEL_SCALE)
     cx, cy = cw // 2, ch // 2
+    panel_left = cx - w // 2
+    panel_bottom = cy - h // 2
 
     hotkey_panel_img.draw(cx, cy, w, h)
+
+    x1 = panel_left + w - int(w * 0.2)
+    y1 = panel_bottom + h - int(h * 0.18)
+    x0 = x1 - int(w * 0.06)
+    y0 = y1 - int(h * 0.12)
+    hotkey_x_rect = (x0, y0, x1, y1)
+
+    if DRAW_MENU_BOUNDS:
+        draw_rectangle(*hotkey_x_rect)
 
 # ----- 무기 강화 관련 헬퍼 -----
 
@@ -955,7 +1013,7 @@ def _attempt_weapon_enchant():
         print("[ENCHANT] FAIL")
 
 def _draw_weapon_window():
-    """무기 강화 창 (P / ui_weapon_open)."""
+    global weapon_x_rect
     if not ui_weapon_open:
         return
 
@@ -978,6 +1036,15 @@ def _draw_weapon_window():
 
     # 배경 패널 이미지
     weapon_panel_img.draw(cx-10, cy+10, w, h)
+
+    x1 = panel_left + w - int(w * 0.185)
+    y1 = panel_bottom + h - int(h * 0.2)
+    x0 = x1 - int(w * 0.06)
+    y0 = y1 - int(h * 0.03)
+    weapon_x_rect = (x0, y0, x1, y1)
+
+    if DRAW_MENU_BOUNDS:
+        draw_rectangle(*weapon_x_rect)
 
     # ======== 안에 들어갈 내용들 ========
     font = boy.font         # 숫자용
@@ -1016,6 +1083,65 @@ def _draw_weapon_window():
         msg_y = panel_bottom + int(h * 0.12)
         font.draw(panel_left + int(w * 0.25), msg_y,
                   last_enchant_msg, (0, 0, 0))
+
+def _draw_menu_bounds():
+    if not menu_open:
+        return
+    if not DRAW_MENU_BOUNDS:
+        return
+    if menu_rect_main is None:
+        return
+
+    # 전체 메뉴 영역
+    draw_rectangle(*menu_rect_main)
+
+    # X 버튼
+    if menu_rect_close:
+        draw_rectangle(*menu_rect_close)
+
+    # 캐릭터 / 인벤 / 단축키 / 무기강화
+    for rect in [menu_rect_char, menu_rect_inven, menu_rect_hotkey, menu_rect_weapon]:
+        if rect:
+            draw_rectangle(*rect)
+
+    # 게임 종료 버튼
+    if menu_rect_exit:
+        draw_rectangle(*menu_rect_exit)
+
+def _handle_subwindow_mouse(event):
+    global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open
+    global char_x_rect, inven_x_rect, hotkey_x_rect, weapon_x_rect
+
+    if event.type != SDL_MOUSEBUTTONDOWN or event.button != SDL_BUTTON_LEFT:
+        return
+
+    mx, my = _canvas_mouse_xy(event)
+
+    # 캐릭터 정보창 X
+    if ui_char_open and _in_rect(mx, my, char_x_rect):
+        ui_char_open = False
+        print("[UI] 캐릭터창 X 클릭 → 닫기")
+        return
+
+    # 인벤창 X
+    if ui_inven_open and _in_rect(mx, my, inven_x_rect):
+        ui_inven_open = False
+        print("[UI] 인벤창 X 클릭 → 닫기")
+        return
+
+    # 단축키창 X
+    if ui_hotkey_open and _in_rect(mx, my, hotkey_x_rect):
+        ui_hotkey_open = False
+        print("[UI] 단축키창 X 클릭 → 닫기")
+        return
+
+    # 무기강화창 X
+    if ui_weapon_open and _in_rect(mx, my, weapon_x_rect):
+        ui_weapon_open = False
+        print("[UI] 무기강화창 X 클릭 → 닫기")
+        return
+
+
 
 
 

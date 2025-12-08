@@ -11,6 +11,7 @@ ITEM_IMAGES = {
     '1000원':      '사진수집/etc/지페.png',
     '5000원':      '사진수집/etc/다발.png',
     '주황버섯의 갓': '사진수집/etc/주황버섯의 갓.png',
+    '빨간포션' :    '사진수집/etc/빨간물약.png',
 }
 
 
@@ -26,6 +27,8 @@ class DropItem:
 
         if kind == '주황버섯의 갓':
             self.scale = 0.13  # 갓은 조금 더 크게
+        elif kind == '빨간포션':
+            self.scale = 0.3
         else:
             self.scale = default_scale
 
