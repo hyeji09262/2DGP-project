@@ -40,6 +40,9 @@ ui_inven_open = False      # I
 ui_hotkey_open = False     # O
 ui_weapon_open = False     # P
 
+char_panel_img = None
+CHAR_PANEL_SCALE = 0.5
+
 DROP_TABLE = [
     ('10원',   0.3),
     ('100원', 0.2),
@@ -96,6 +99,18 @@ MAPS = {
         "spawn_monsters": True
     },
 }
+
+def _fmt_num(n, max_digits=6):
+    try:
+        v = int(n)
+    except:
+        return str(n)
+    s = str(v)
+    if len(s) > max_digits:
+        # 예: 1234567 -> 12345+
+        return s[:max_digits - 1] + '+'
+    return s
+
 def _init_menu_layout():
     global menu_rect_main, menu_rect_close
     global menu_rect_char, menu_rect_inven, menu_rect_hotkey, menu_rect_weapon, menu_rect_exit
@@ -160,12 +175,17 @@ def _init_menu_layout():
 def init():
     global field, boy, current_map, _transition_cooldown, monsters, items
     global menu_open, menu_img
+    global char_panel_img
 
     load_map("henesys", "default")
 
     menu_open = False
 
     menu_img = load_image('사진수집/etc/메뉴창.png')
+    char_panel_img = load_image('사진수집/etc/캐릭터정보.png')
+
+    print("[INIT] char_panel_img =", char_panel_img)
+    print("[INIT] char_panel_img size =", char_panel_img.w, char_panel_img.h)
 
     _init_menu_layout()
 
@@ -633,6 +653,8 @@ def _draw_menu():
 def _draw_subwindows():
     cw, ch = get_canvas_width(), get_canvas_height()
 
+    _draw_char_window()
+
     # 캐릭터 정보 (U)
     if ui_char_open:
         w, h = 500, 320
@@ -669,7 +691,99 @@ def _draw_subwindows():
         y1 = y0 + h
         draw_rectangle(x0, y0, x1, y1)
 
+def _draw_boy_portrait(px, py):
+    if boy is None or boy.image is None:
+        return
 
+    # Idle 스프라이트 한 줄 기준 (boy.Idle.draw에서 쓰던 값)
+    W, H = 56, 80
+    PITCH = 58
+    START_X = 0
+    START_Y = 720
+
+    frame_index = 0
+    left = START_X + frame_index * PITCH
+    bottom = START_Y
+
+    S = 2.2  # 초상화 크기
+    DW, DH = int(W * S), int(H * S)
+    foot_fix = (DH - H) // 2
+    y = py - foot_fix
+
+    flip = 'h'
+
+    boy.image.clip_composite_draw(left, bottom, W, H,
+                                  0, flip,
+                                  px, y, DW, DH)
+
+def _draw_char_window():
+    if not ui_char_open:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    if char_panel_img is None:
+        # 이미지 없을 때 임시 박스
+        w, h = 500, 320
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        x1 = x0 + w
+        y1 = y0 + h
+        draw_rectangle(x0, y0, x1, y1)
+        return
+
+    # 패널 위치/크기
+    w = int(char_panel_img.w * CHAR_PANEL_SCALE)
+    h = int(char_panel_img.h * CHAR_PANEL_SCALE)
+    cx, cy = cw // 2, ch // 2
+    panel_left   = cx - w // 2
+    panel_bottom = cy - h // 2
+
+    # 패널 이미지 그리기
+    char_panel_img.draw(cx, cy, w, h)
+
+    # -----------------------
+    # 1) 왼쪽 초상화 (그림 박스 안 중앙쯤)
+    # -----------------------
+    face_cx = panel_left + int(w * 0.35)
+    face_cy = panel_bottom + int(h * 0.55)
+    _draw_boy_portrait(face_cx, face_cy)
+
+    # -----------------------
+    # 2) 오른쪽 숫자들만 출력
+    #    (라벨은 PNG 안에 이미 있음)
+    # -----------------------
+    lvl = getattr(boy, 'level', 1)
+    exp = getattr(boy, 'exp', 0)
+    exp_to_next = getattr(boy, 'exp_to_next', 1)
+    wlv = getattr(boy, 'weapon_level', 1)
+    atk = getattr(boy, 'attack', getattr(boy, 'attack_power', 0))
+
+    # 너무 길면 잘라서 표시
+    lvl_s = _fmt_num(lvl, max_digits=4)
+    exp_s = _fmt_num(exp, max_digits=6)
+    exp_next_s = _fmt_num(exp_to_next, max_digits=6)
+    wlv_s = _fmt_num(wlv, max_digits=4)
+    atk_s = _fmt_num(atk, max_digits=6)
+
+    font = boy.ui_font
+
+    # 숫자는 각 박스의 오른쪽 부분에 정렬되게
+    num_x = panel_left + int(w * 0.58)  # 오른쪽으로 조금 붙이기
+
+    # 위쪽 흰 박스(레벨/경험치) 안 y 좌표
+    level_y = panel_bottom + int(h * 0.63)
+    exp_y = panel_bottom + int(h * 0.53)
+
+    # 아래 흰 박스(무기레벨/공격력) 안 y 좌표
+    weapon_y = panel_bottom + int(h * 0.38)
+    attack_y = panel_bottom + int(h * 0.295)
+
+    # ---- 숫자만 출력 ----
+    font.draw(num_x, level_y, lvl_s, (0, 0, 0))  # 레벨
+    font.draw(num_x, exp_y, f'{exp_s}/{exp_next_s}', (0, 0, 0))  # 경험치
+    font.draw(num_x, weapon_y, wlv_s, (0, 0, 0))  # 무기레벨
+    font.draw(num_x, attack_y, atk_s, (0, 0, 0))
 
 
 

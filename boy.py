@@ -96,7 +96,7 @@ class Idle:
 
 
     def draw(self):
-        W, H = 55, 80
+        W, H = 56, 80
         PITCH = 58 # 프레임 간 간격 (칸폭+여백)
         START_X = 0
         START_Y = 720  # 그 줄의 bottom
@@ -443,6 +443,7 @@ class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
         self.font_big = load_font('ENCR10B.TTF', 25)
+        self.ui_font = load_font('ENCR10B.TTF', 20)
         self.image = load_image('사진수집/character/캐릭터 3.png')
         self.die_image = load_image('사진수집/etc/무덤.png')
 
