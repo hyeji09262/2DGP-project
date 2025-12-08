@@ -211,84 +211,57 @@ def init():
     _init_menu_layout()
 
 def _handle_menu_event(event):
-    global menu_open, ui_inven_open, ui_weapon_open
+    global menu_open, ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open
 
-    if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-        menu_open = False
-        return
+    # 마우스 왼쪽 클릭만 처리
+    if event.type == SDL_MOUSEBUTTONDOWN and event.button == SDL_BUTTON_LEFT:
+        mx, my = event.x, event.y
+        # print("[MENU] mouse click:", mx, my)
 
-    if event.type == SDL_KEYDOWN:
-        if event.key == SDLK_u:
+        # X 버튼 클릭 → 메뉴 닫기
+        if _in_rect(mx, my, menu_rect_close):
+            menu_open = False
+            print("[MENU] X 버튼 클릭 → 메뉴 닫기")
+            return
+
+        # '캐릭터 정보' 버튼 (왼쪽 위)
+        if _in_rect(mx, my, menu_rect_char):
             menu_open = False
             ui_char_open = True
             ui_inven_open = ui_hotkey_open = ui_weapon_open = False
-            print("[MENU] 캐릭터 정보 (U)")
+            print("[MENU] 캐릭터 정보 클릭")
             return
-        elif event.key == SDLK_i:
+
+        # '인벤토리' 버튼 (오른쪽 위)
+        if _in_rect(mx, my, menu_rect_inven):
             menu_open = False
             ui_inven_open = True
             ui_char_open = ui_hotkey_open = ui_weapon_open = False
-            print("[MENU] 인벤토리 (I)")
+            print("[MENU] 인벤토리 클릭")
             return
-        elif event.key == SDLK_o:
+
+        # '단축키 정보' 버튼 (왼쪽 아래)
+        if _in_rect(mx, my, menu_rect_hotkey):
             menu_open = False
             ui_hotkey_open = True
             ui_char_open = ui_inven_open = ui_weapon_open = False
-            print("[MENU] 단축키 정보 (O)")
+            print("[MENU] 단축키 정보 클릭")
             return
 
-        elif event.key == SDLK_p:
+        # '무기 강화' 버튼 (오른쪽 아래)
+        if _in_rect(mx, my, menu_rect_weapon):
             menu_open = False
             ui_weapon_open = True
             ui_char_open = ui_inven_open = ui_hotkey_open = False
-            print("[MENU] 무기 강화 (P)")
+            print("[MENU] 무기 강화 클릭")
             return
 
-            # 마우스 왼쪽 클릭
-        if event.type == SDL_MOUSEBUTTONDOWN and event.button == SDL_BUTTON_LEFT:
-            mx, my = event.x, event.y
+        # '게임 종료' 버튼 클릭
+        if _in_rect(mx, my, menu_rect_exit):
+            print("[MENU] 게임 종료 클릭 → game_framework.quit()")
+            game_framework.quit()
+            return
 
-            # X 버튼
-            if _in_rect(mx, my, menu_rect_close):
-                menu_open = False
-                print("[MENU] 닫기 버튼 클릭")
-                return
-            if _in_rect(mx, my, menu_rect_char):
-                menu_open = False
-                ui_char_open = True
-                ui_inven_open = ui_hotkey_open = ui_weapon_open = False
-                print("[MENU] 캐릭터 정보 클릭")
-                return
-
-                # 인벤토리
-            if _in_rect(mx, my, menu_rect_inven):
-                menu_open = False
-                ui_inven_open = True
-                ui_char_open = ui_hotkey_open = ui_weapon_open = False
-                print("[MENU] 인벤토리 클릭")
-                return
-
-                # 단축키 정보
-            if _in_rect(mx, my, menu_rect_hotkey):
-                menu_open = False
-                ui_hotkey_open = True
-                ui_char_open = ui_inven_open = ui_weapon_open = False
-                print("[MENU] 단축키 정보 클릭")
-                return
-
-                # 무기 강화
-            if _in_rect(mx, my, menu_rect_weapon):
-                menu_open = False
-                ui_weapon_open = True
-                ui_char_open = ui_inven_open = ui_hotkey_open = False
-                print("[MENU] 무기 강화 클릭")
-                return
-
-                # 게임 종료
-            if _in_rect(mx, my, menu_rect_exit):
-                print("[MENU] 게임 종료 클릭")
-                game_framework.quit()
-                return
 
 
 def _in_rect(x, y, rect): #esc 마우스 처리
@@ -517,11 +490,10 @@ def handle_events():
 
         # ====== 메뉴가 열려 있을 때 마우스 처리 (나중에 버튼 클릭용) ======
         if menu_open:
-            # 여기서 _handle_menu_event(event) 같은 걸 부르면 됨
-            # 지금은 스킵
+            _handle_menu_event(event)
             continue
 
-        # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
+            # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
         boy.handle_event(event)
 
 
@@ -1025,8 +997,8 @@ def _draw_weapon_window():
     font.draw(chance_x, chance_y, f" {int(rate * 100)}%", (255, 80, 80))
 
     # 2) 가운데 "강화 전 / 강화 후" 박스: 공격력 값
-    before_x = panel_left + int(w * 0.34)
-    after_x  = panel_left + int(w * 0.64)
+    before_x = panel_left + int(w * 0.33)
+    after_x  = panel_left + int(w * 0.62)
     atk_y    = panel_bottom + int(h * 0.44)
 
     font.draw(before_x, atk_y, str(atk_before), (0, 0, 0))
