@@ -489,6 +489,9 @@ class Boy:
         self.hp = self.max_hp
         self.alive = True
 
+        self.gold = 0
+        self.inventory = {}
+
         self.hp_bar_img = load_image('사진수집/etc/hp_bar_red.png')  # 빨간 바
         self.exp_bar_img = load_image('사진수집/etc/exp_bar_green.png')  # 초록 바
 
@@ -799,13 +802,22 @@ class Boy:
         self.state_machine.handle_state_event(('TAKE_HIT', from_dir))
 
     def obtain_item(self, kind: str):
-        """드랍템을 주웠을 때 호출 (인벤토리에 기록)"""
-        if kind in self.inventory:
-            self.inventory[kind] += 1
-        else:
-            self.inventory[kind] = 1
+        # 돈 종류는 gold에 누적
+        if kind == '10원':
+            self.gold += 10
+            return
+        elif kind == '100원':
+            self.gold += 100
+            return
+        elif kind == '1000원':
+            self.gold += 1000
+            return
+        elif kind == '5000원':
+            self.gold += 5000
+            return
 
-        print(f"OBTAIN ITEM: {kind}, now have {self.inventory[kind]}")
+            # 그 외는 인벤토리 아이템
+        self.inventory[kind] = self.inventory.get(kind, 0) + 1
 
     def gain_exp(self, amount: int):
         """경험치 획득"""

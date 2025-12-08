@@ -7,7 +7,7 @@ import game_world
 from boy import Boy
 from field import Field
 from monster import Mushroom
-from item import DropItem
+from item import DropItem, ITEM_IMAGES
 
 field = None
 boy = None
@@ -42,6 +42,10 @@ ui_weapon_open = False     # P
 
 char_panel_img = None
 CHAR_PANEL_SCALE = 0.5
+
+inven_panel_img = None
+INVEN_PANEL_SCALE = 0.5
+inv_item_images = {}
 
 DROP_TABLE = [
     ('10원',   0.3),
@@ -176,6 +180,8 @@ def init():
     global field, boy, current_map, _transition_cooldown, monsters, items
     global menu_open, menu_img
     global char_panel_img
+    global inven_panel_img, inv_item_images
+
 
     load_map("henesys", "default")
 
@@ -184,8 +190,9 @@ def init():
     menu_img = load_image('사진수집/etc/메뉴창.png')
     char_panel_img = load_image('사진수집/etc/캐릭터정보.png')
 
-    print("[INIT] char_panel_img =", char_panel_img)
-    print("[INIT] char_panel_img size =", char_panel_img.w, char_panel_img.h)
+    inven_panel_img = load_image('사진수집/etc/인벤2.png')
+
+    inv_item_images = {}
 
     _init_menu_layout()
 
@@ -438,50 +445,66 @@ def handle_events():
 
     event_list = get_events()
     for event in event_list:
+        # 창 닫기
         if event.type == SDL_QUIT:
             game_framework.quit()
+            continue
 
+        # ESC 키
+        if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
+            # 서브창/메뉴 다 닫기
+            if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
+                ui_char_open = ui_inven_open = ui_hotkey_open = ui_weapon_open = False
+                print("[UI] 서브창 닫기 (ESC)")
+            else:
+                # 아무 서브창도 안 열려 있으면 메뉴 토글
+                menu_open = not menu_open
+                print("[UI] 메뉴 토글 =", menu_open)
+            continue
+
+        # ====== 서브창 단축키 ======
         if event.type == SDL_KEYDOWN:
+            # 캐릭터 정보 (U)
             if event.key == SDLK_u:
                 ui_char_open = True
                 ui_inven_open = ui_hotkey_open = ui_weapon_open = False
                 menu_open = False
                 print("[GLOBAL] 캐릭터 정보 (U)")
                 continue
-            elif event.key == SDLK_i:
+
+            # 인벤토리 (I)
+            if event.key == SDLK_i:
                 ui_inven_open = True
                 ui_char_open = ui_hotkey_open = ui_weapon_open = False
                 menu_open = False
                 print("[GLOBAL] 인벤토리 (I)")
                 continue
-            elif event.key == SDLK_o:
+
+            # 단축키 정보 (O)
+            if event.key == SDLK_o:
                 ui_hotkey_open = True
                 ui_char_open = ui_inven_open = ui_weapon_open = False
                 menu_open = False
                 print("[GLOBAL] 단축키 정보 (O)")
                 continue
-            elif event.key == SDLK_p:
+
+            # 무기 강화 (P)
+            if event.key == SDLK_p:
                 ui_weapon_open = True
                 ui_char_open = ui_inven_open = ui_hotkey_open = False
                 menu_open = False
                 print("[GLOBAL] 무기 강화 (P)")
                 continue
-        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
-            if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-                ui_char_open = ui_inven_open = ui_hotkey_open = ui_weapon_open = False
-                print("[UI] 서브창 닫기 (ESC)")
-            # 서브창 열려 있을 땐 다른 입력은 무시
-            continue
-        if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-            menu_open = not menu_open
-            print("ESC pressed, menu_open =", menu_open)
-            continue
 
+        # ====== 메뉴가 열려 있을 때 마우스 처리 (나중에 버튼 클릭용) ======
         if menu_open:
-            _handle_menu_event(event)
+            # 여기서 _handle_menu_event(event) 같은 걸 부르면 됨
+            # 지금은 스킵
             continue
 
+        # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
         boy.handle_event(event)
+
 
 
 def _handle_collisions():
@@ -616,7 +639,6 @@ def draw():
         scaled_h = int(menu_img.h * MENU_SCALE)
         menu_img.draw(cw // 2, ch // 2, scaled_w, scaled_h)
 
-        # 인벤토리 / 무기 강화 창
     _draw_subwindows()
 
     update_canvas()
@@ -655,23 +677,7 @@ def _draw_subwindows():
 
     _draw_char_window()
 
-    # 캐릭터 정보 (U)
-    if ui_char_open:
-        w, h = 500, 320
-        x0 = cw // 2 - w // 2
-        y0 = ch // 2 - h // 2
-        x1 = x0 + w
-        y1 = y0 + h
-        draw_rectangle(x0, y0, x1, y1)
-
-    # 인벤토리 (I)
-    if ui_inven_open:
-        w, h = 500, 320
-        x0 = cw // 2 - w // 2
-        y0 = ch // 2 - h // 2
-        x1 = x0 + w
-        y1 = y0 + h
-        draw_rectangle(x0, y0, x1, y1)
+    _draw_inventory_window()
 
     # 단축키 정보 (O)
     if ui_hotkey_open:
@@ -785,6 +791,102 @@ def _draw_char_window():
     font.draw(num_x, weapon_y, wlv_s, (0, 0, 0))  # 무기레벨
     font.draw(num_x, attack_y, atk_s, (0, 0, 0))
 
+def _draw_inventory_window():
+    if not ui_inven_open:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    if inven_panel_img is None:
+            # 이미지 없으면 임시 박스
+        w, h = 300, 500
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        draw_rectangle(x0, y0, x0 + w, y0 + h)
+        return
+
+        # 패널 위치/크기
+    w = int(inven_panel_img.w * INVEN_PANEL_SCALE)
+    h = int(inven_panel_img.h * INVEN_PANEL_SCALE)
+    cx, cy = cw // 2, ch // 2
+    panel_left = cx - w // 2
+    panel_bottom = cy - h // 2
+
+        # 패널 이미지 그리기
+    inven_panel_img.draw(cx, cy, w, h)
+
+        # ==========================
+        # 1) 인벤 아이템 그리드
+        #    (돈 제외한 아이템들만)
+        # ==========================
+    money_kinds = ('10원', '100원', '1000원', '5000원')
+
+        # (kind, count) 리스트 만들기
+    inv_list = []
+    for kind, cnt in getattr(boy, 'inventory', {}).items():
+        if cnt <= 0:
+            continue
+        if kind in money_kinds:
+            continue
+        inv_list.append((kind, cnt))
+        # 4 x 5 슬롯 (위 그림 기준)
+    cols, rows = 4, 5
+    max_slots = cols * rows
+
+        #내부 그리드 영역 (패널 비율로 계산)
+    grid_left = panel_left + int(w * 0.22)
+    grid_right = panel_left + int(w * 0.82)
+    grid_bottom = panel_bottom + int(h * 0.16)
+    grid_top = panel_bottom + int(h * 0.82)
+
+    slot_w = (grid_right - grid_left) / cols
+    slot_h = (grid_top - grid_bottom) / rows
+
+        # 아이콘 크기 비율
+    icon_scale = 0.1
+
+    for idx in range(min(len(inv_list), max_slots)):
+        kind, cnt = inv_list[idx]
+        c = idx % cols  # 0 ~ 3
+        r = idx // cols  # 0 ~ 4 (0이 맨 위)
+            # 슬롯 중심 좌표
+        cx_slot = grid_left + slot_w * (c + 0.5)
+        cy_slot = grid_top - slot_h * (r + 0.5)
+
+            # 아이콘 이미지 준비 (캐시 사용)
+        if kind not in inv_item_images:
+            path = ITEM_IMAGES.get(kind, None)
+            if path:
+                inv_item_images[kind] = load_image(path)
+        img = inv_item_images.get(kind, None)
+        if img is None:
+            continue
+
+            # 아이콘 그리기
+        iw = int(img.w * icon_scale)
+        ih = int(img.h * icon_scale)
+        img.draw(int(cx_slot), int(cy_slot), iw, ih)
+
+            # 개수 숫자 (오른쪽 아래에 작게)
+        count_str = str(cnt)
+        font = boy.font
+        font.draw(int(cx_slot + slot_w * 0.15),
+                    int(cy_slot - slot_h * 0.25),
+                    count_str, (0, 0, 0))
+
+        # ==========================
+        # 2) 누적 금액 표시 (맨 아래 흰 박스)
+        # ==========================
+    gold = getattr(boy, 'gold', 0)
+    gold_str = f'{gold}'
+
+    font = boy.font
+
+        # 아래 하얀 바 중앙쯤
+    gold_x = cx
+    gold_y = panel_bottom + int(h * 0.10)
+
+    font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (0, 0, 0))
 
 
 def finish():
