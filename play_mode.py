@@ -329,7 +329,7 @@ def update():
                     game_world.add_object(item, 1)
                     items.append(item)
 
-                boy.gain_exp(10)
+                boy.gain_exp(50)
 
                 game_world.remove_object(o)
                 if o in monsters:

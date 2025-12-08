@@ -442,6 +442,7 @@ class Die:
 class Boy:
     def __init__(self):
         self.font = load_font('ENCR10B.TTF', 16)
+        self.font_big = load_font('ENCR10B.TTF', 25)
         self.image = load_image('사진수집/character/캐릭터 3.png')
         self.die_image = load_image('사진수집/etc/무덤.png')
 
@@ -486,6 +487,9 @@ class Boy:
         self.max_hp = self.base_max_hp
         self.hp = self.max_hp
         self.alive = True
+
+        self.hp_bar_img = load_image('사진수집/etc/hp_bar_red.png')  # 빨간 바
+        self.exp_bar_img = load_image('사진수집/etc/exp_bar_green.png')  # 초록 바
 
 
         self.inventory = {
@@ -819,62 +823,90 @@ class Boy:
         self.level += 1
         print(f"[PLAYER] LEVEL UP! Lv.{self.level}")
 
-        self.max_hp += 20  # 레벨당 +20
+        self.max_hp += 10  # 레벨당 +20
 
         # 체력 풀 회복
         self.hp = self.max_hp
 
-        self.exp_to_next = int(self.exp_to_next * 1.5)
+        self.exp_to_next = int(self.exp_to_next * 1.8)
         if self.exp_to_next < 50:
             self.exp_to_next = 50
 
         print(f"[PLAYER] NEXT EXP = {self.exp_to_next}")
 
     def draw_ui(self):
+
         cw = get_canvas_width()
         ch = get_canvas_height()
 
-        base_width = 200
-        bar_height = 16
+        # 바 크기 설정 (원하는대로 크기 조절)
+        hp_bar_width = 300  # 가로 길이
+        hp_bar_height = 20  # HP 바 두께
+        exp_bar_height = 10  # EXP 바 두께
 
-        width_ratio = self.max_hp / self.base_max_hp if self.base_max_hp > 0 else 1.0
-        max_bar_width = int(base_width * width_ratio)
-
-        # ✅ 화면 중앙 아래 정렬
+        # 화면 중앙 아래 정렬
         center_x = cw // 2
-        bar_x0 = center_x - max_bar_width // 2
-        hp_bar_y0 = 40  # 화면 아래에서 40픽셀 위
-        hp_bar_y1 = hp_bar_y0 + bar_height
+        hp_x0 = center_x - hp_bar_width // 2
+        hp_y0 = 40  # 화면 맨 아래에서 40픽셀 위
+        hp_y1 = hp_y0 + hp_bar_height
 
-        # HP 비율
+        # === HP 비율 ===
         hp_ratio = self.hp / self.max_hp if self.max_hp > 0 else 0.0
         hp_ratio = max(0.0, min(1.0, hp_ratio))
-        cur_hp_width = int(max_bar_width * hp_ratio)
+        cur_hp_width = int(hp_bar_width * hp_ratio)
 
-        draw_rectangle(bar_x0, hp_bar_y0, bar_x0 + max_bar_width, hp_bar_y1)
-        # 현재 HP 바
+        # === HP 바 빨간색 채우기 ===
         if cur_hp_width > 0:
-            draw_rectangle(bar_x0, hp_bar_y0, bar_x0 + cur_hp_width, hp_bar_y1)
+            hp_center_x = hp_x0 + cur_hp_width // 2
+            hp_center_y = (hp_y0 + hp_y1) // 2
 
-        # HP 글자 (HP / MaxHP / Lv)
-        hp_text = f"HP {self.hp}/{self.max_hp}   Lv.{self.level}"
-        self.font.draw(bar_x0, hp_bar_y1 + 5, hp_text, (255, 255, 255))
+            # 빨간 바 이미지를 현재 체력 비율만큼 가로로 늘려서 그림
+            self.hp_bar_img.draw(hp_center_x, hp_center_y,
+                                 cur_hp_width, hp_bar_height)
 
-        exp_bar_y0 = hp_bar_y0 - 14
-        exp_bar_y1 = exp_bar_y0 + 8
+        # HP 바 테두리 (빨간 선이라도 상관없으면 draw_rectangle 계속 써도 됨)
+        draw_rectangle(hp_x0, hp_y0, hp_x0 + hp_bar_width, hp_y1)
+
+        # === 왼쪽에 큰 레벨 표시 ===
+        lv_text = f"Lv.{self.level}"
+        lv_x = hp_x0 - 80  # 더 왼쪽으로 빼고 싶으면 숫자 늘리기
+        lv_y = hp_y0 + 2
+        self.font_big.draw(lv_x, lv_y, lv_text, (255, 255, 0))
+
+        # HP 숫자(작은 글씨) – 바 위에 흰색으로
+        hp_text = f"{self.hp}/{self.max_hp}"
+        self.font.draw(hp_x0, hp_y1 + 10, hp_text, (255, 255, 255))
+
+        # === EXP 바 (초록색) ===
+        exp_y0 = hp_y0 - 16
+        exp_y1 = exp_y0 + exp_bar_height
+        exp_center_y = (exp_y0 + exp_y1) // 2
 
         if self.exp_to_next > 0:
             exp_ratio = self.exp / self.exp_to_next
         else:
             exp_ratio = 0.0
         exp_ratio = max(0.0, min(1.0, exp_ratio))
+        cur_exp_width = int(hp_bar_width * exp_ratio)
 
-        # EXP 전체 바 테두리
-        draw_rectangle(bar_x0, exp_bar_y0, bar_x0 + max_bar_width, exp_bar_y1)
+        # 1) 배경 프레임 느낌으로 연한 초록 바 전체 길이 그리기
+        full_center_x = hp_x0 + hp_bar_width // 2
+        try:
+            self.exp_bar_img.opacify(0.5)  # 연하게 (투명)
+            self.exp_bar_img.draw(full_center_x, exp_center_y,
+                                  hp_bar_width, exp_bar_height)
+            self.exp_bar_img.opacify(1.0)  # 다시 원래 불투명으로
+        except:
+            # opacify 지원 안 되면 그냥 한 번만 그려도 됨
+            self.exp_bar_img.draw(full_center_x, exp_center_y,
+                                  hp_bar_width, exp_bar_height)
 
-        cur_exp_width = int(max_bar_width * exp_ratio)
+            # 2) 실제 채워지는 부분 (진한 초록)
         if cur_exp_width > 0:
-            draw_rectangle(bar_x0, exp_bar_y0, bar_x0 + cur_exp_width, exp_bar_y1)
+            fill_center_x = hp_x0 + cur_exp_width // 2
+            self.exp_bar_img.draw(fill_center_x, exp_center_y,
+                                  cur_exp_width, exp_bar_height)
 
+        # EXP 숫자 (밑에 회색 글자)
         exp_text = f"EXP {int(self.exp)}/{self.exp_to_next}"
-        self.font.draw(bar_x0, exp_bar_y0 - 12, exp_text, (200, 200, 200))
+        self.font.draw(hp_x0, exp_y0 - 12, exp_text, (200, 200, 200))
