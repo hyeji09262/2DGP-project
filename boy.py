@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT,delay , draw_rectangle)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT, get_canvas_width, get_canvas_height, draw_rectangle)
 
 import game_framework
 from state_machine import StateMachine
@@ -478,6 +478,16 @@ class Boy:
         self.attack_active = False
         self.attack_style = 0
 
+        self.level = 1
+        self.exp = 0
+        self.exp_to_next = 100
+
+        self.base_max_hp = 100
+        self.max_hp = self.base_max_hp
+        self.hp = self.max_hp
+        self.alive = True
+
+
         self.inventory = {
             '10원': 0,
             '100원': 0,
@@ -756,41 +766,31 @@ class Boy:
             return (bx0 - reach, ay0, bx0, ay1)
 
     def take_hit(self, from_dir: int, damage: int = 1):
-        if self.if_timer > 0 or not self.alive:
+        if not getattr(self, 'alive', True):
+            return
+
+        if self.if_timer > 0:
             return
 
         self.hp -= damage
-        print(f"PLAYER HIT! damage={damage}, hp={self.hp}")
-
         if self.hp <= 0:
             self.hp = 0
-            self.alive = False  # 더 이상 살아있지 않음
-            self.dead_anim_t = 0.0  # 죽는 애니 시간 리셋
-            self.dead_anim_done = False
-
-            IMPULSE = 20
-            knock_dir = -1 if from_dir > 0 else 1
-            self.x += knock_dir * IMPULSE
-
-            # 🔥 상태머신에 DIE 이벤트 안 보내고 여기서 끝!
-            return
-
-        if self.hp <= 0:
-            # 완전히 죽음
             self.alive = False
-            # 넉백은 한 번만 가볍게 줄 수도 있고 안 줘도 됨
-            IMPULSE = 20
-            knock_dir = -1 if from_dir > 0 else 1
-            self.x += knock_dir * IMPULSE
+            print("[PLAYER] DEAD")
 
-            self.state_machine.handle_state_event(('DIE', from_dir))
+            self.dir = 0
+            self.velocity = 0
+
             return
 
-        self.if_timer = 0.5
-        IMPULSE = 20
+        self.if_timer = 0.5  # 0.5초 동안 무적
+
+        IMPULSE = 20  # 한 번에 튕겨나가는 거리
+        # 공격 반대 방향으로 넉백
         knock_dir = -1 if from_dir > 0 else 1
         self.x += knock_dir * IMPULSE
 
+        # 피격 상태로 전환 (Hit 상태가 TAKE_HIT 이벤트를 받아서 처리)
         self.state_machine.handle_state_event(('TAKE_HIT', from_dir))
 
     def obtain_item(self, kind: str):
@@ -801,3 +801,80 @@ class Boy:
             self.inventory[kind] = 1
 
         print(f"OBTAIN ITEM: {kind}, now have {self.inventory[kind]}")
+
+    def gain_exp(self, amount: int):
+        """경험치 획득"""
+        if not getattr(self, 'alive', True):
+            return
+
+        self.exp += amount
+        print(f"[PLAYER] GET EXP {amount}, now {self.exp}/{self.exp_to_next}")
+
+        while self.exp >= self.exp_to_next:
+            self.exp -= self.exp_to_next
+            self.level_up()
+
+    def level_up(self):
+        """레벨업 시 체력, 필요 경험치 증가"""
+        self.level += 1
+        print(f"[PLAYER] LEVEL UP! Lv.{self.level}")
+
+        self.max_hp += 20  # 레벨당 +20
+
+        # 체력 풀 회복
+        self.hp = self.max_hp
+
+        self.exp_to_next = int(self.exp_to_next * 1.5)
+        if self.exp_to_next < 50:
+            self.exp_to_next = 50
+
+        print(f"[PLAYER] NEXT EXP = {self.exp_to_next}")
+
+    def draw_ui(self):
+        cw = get_canvas_width()
+        ch = get_canvas_height()
+
+        base_width = 200
+        bar_height = 16
+
+        width_ratio = self.max_hp / self.base_max_hp if self.base_max_hp > 0 else 1.0
+        max_bar_width = int(base_width * width_ratio)
+
+        # ✅ 화면 중앙 아래 정렬
+        center_x = cw // 2
+        bar_x0 = center_x - max_bar_width // 2
+        hp_bar_y0 = 40  # 화면 아래에서 40픽셀 위
+        hp_bar_y1 = hp_bar_y0 + bar_height
+
+        # HP 비율
+        hp_ratio = self.hp / self.max_hp if self.max_hp > 0 else 0.0
+        hp_ratio = max(0.0, min(1.0, hp_ratio))
+        cur_hp_width = int(max_bar_width * hp_ratio)
+
+        draw_rectangle(bar_x0, hp_bar_y0, bar_x0 + max_bar_width, hp_bar_y1)
+        # 현재 HP 바
+        if cur_hp_width > 0:
+            draw_rectangle(bar_x0, hp_bar_y0, bar_x0 + cur_hp_width, hp_bar_y1)
+
+        # HP 글자 (HP / MaxHP / Lv)
+        hp_text = f"HP {self.hp}/{self.max_hp}   Lv.{self.level}"
+        self.font.draw(bar_x0, hp_bar_y1 + 5, hp_text, (255, 255, 255))
+
+        exp_bar_y0 = hp_bar_y0 - 14
+        exp_bar_y1 = exp_bar_y0 + 8
+
+        if self.exp_to_next > 0:
+            exp_ratio = self.exp / self.exp_to_next
+        else:
+            exp_ratio = 0.0
+        exp_ratio = max(0.0, min(1.0, exp_ratio))
+
+        # EXP 전체 바 테두리
+        draw_rectangle(bar_x0, exp_bar_y0, bar_x0 + max_bar_width, exp_bar_y1)
+
+        cur_exp_width = int(max_bar_width * exp_ratio)
+        if cur_exp_width > 0:
+            draw_rectangle(bar_x0, exp_bar_y0, bar_x0 + cur_exp_width, exp_bar_y1)
+
+        exp_text = f"EXP {int(self.exp)}/{self.exp_to_next}"
+        self.font.draw(bar_x0, exp_bar_y0 - 12, exp_text, (200, 200, 200))

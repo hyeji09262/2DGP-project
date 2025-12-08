@@ -22,13 +22,20 @@ class DropItem:
         self.kind = kind
         self.collected = False
 
-        self.scale = 0.2
+        default_scale = 0.2
+
+        if kind == '주황버섯의 갓':
+            self.scale = 0.13  # 갓은 조금 더 크게
+        else:
+            self.scale = default_scale
 
         self.ground_offset = -60
 
         # 이미지 로드
         path = ITEM_IMAGES.get(kind, ITEM_IMAGES['주황버섯의 갓'])
         self.image = load_image(path)
+
+        print('[DropItem] TRY LOAD:', kind, '=>', path)
 
         # 히트박스 반지름 (이미지+스케일 기준)
         base = max(self.image.w, self.image.h) * self.scale

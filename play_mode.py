@@ -130,10 +130,16 @@ def load_map(name: str, entry: str = "default"):
         boy.up_pressed = False
 
     field.update()
+    monsters.clear()
+    items.clear()
 
     for layer in game_world.world:
         layer[:] = [o for o in layer if not isinstance(o, Mushroom)]
     monsters.clear()
+
+    for layer in game_world.world:
+        layer[:] = [o for o in layer if not isinstance(o, DropItem)]
+    items.clear()
 
     # 새 버섯 무작위 소환
     if data.get("spawn_monsters", False):
@@ -310,19 +316,30 @@ def update():
     _handle_item_pickup()
 
     for layer in game_world.world:
-        for o in list(layer):
+        for o in list(layer):  # 복사본 돌면서 제거
+            # 몬스터 죽으면 드랍 생성 + 몬스터 제거
             if isinstance(o, Mushroom) and getattr(o, 'dead', False):
-
-                if random.random() < 0.7:  # 70% 확률로만 드랍, 30%는 그냥 안 줌
+                # 드랍 확률 (원하면 수정)
+                if random.random() < 0.7:
                     drop_x = o.x
                     drop_y = o.y + 20
-
-                    kind = _choose_drop_kind()  # ← 여기서 확률로 10원/100원/1000원... 뽑힘
+                    kind = _choose_drop_kind()
+                    print('[PLAYMODE] SPAWN DROP:', kind, 'at', drop_x, drop_y)
                     item = DropItem(drop_x, drop_y, field=field, kind=kind)
                     game_world.add_object(item, 1)
                     items.append(item)
 
+                boy.gain_exp(10)
+
                 game_world.remove_object(o)
+                if o in monsters:
+                    monsters.remove(o)
+
+            if isinstance(o, DropItem) and getattr(o, 'expired', False):
+                print('[PLAYMODE] REMOVE EXPIRED DROP:', o.kind)
+                game_world.remove_object(o)
+                if o in items:
+                    items.remove(o)
 
 
 def draw():
@@ -349,6 +366,9 @@ def draw():
             sx0, sy0 = field.world_to_screen(l, b)
             sx1, sy1 = field.world_to_screen(r, t)
             draw_rectangle(sx0, sy0, sx1, sy1)
+
+    if boy:
+        boy.draw_ui()
 
     update_canvas()
 

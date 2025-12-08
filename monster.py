@@ -30,12 +30,13 @@ class Mushroom:
     DIE_FRAMES = [
         (240, 25, 130, 102),
         (380, 25, 120, 100),
-        (480, 25, 120, 100),
+        (490, 25, 120, 100),
     ]
     FPS_DIE = 8.0
 
     FRAME_SCALE = 0.8
-    FRAME_FOOT_ADJ = 45
+    FOOT_ADJ_RUN = 45
+    FOOT_ADJ_DIE = 65
     FRAME_BB_OFFSET_Y = 30
 
     def __init__(self, x, y, field=None):
@@ -46,8 +47,10 @@ class Mushroom:
         self.acc = 0.0
         self.state_t = 0.0
 
+
         self.scale = self.FRAME_SCALE
-        self.foot_adj = self.FRAME_FOOT_ADJ
+        self.foot_adj_run = self.FOOT_ADJ_RUN
+        self.foot_adj_die = self.FOOT_ADJ_DIE
         self.bb_offset_y = self.FRAME_BB_OFFSET_Y
 
         self.image = load_image(SHEET_PATH)
@@ -190,24 +193,28 @@ class Mushroom:
                 self.y = self.camera.ground_y(self.x)
 
     def draw(self):
-        if self.dead:
+        if getattr(self, 'dead', False):
             return
 
         sx, sy = self.screen_xy()
         flip = '' if self.dir == -1 else 'h'
 
         if self.state == 'run':
-            i = self.frame % len(self.RUN_FRAMES)
-            left, bottom, width, height = self.RUN_FRAMES[i]
+            frames = self.RUN_FRAMES
+            foot_adj = self.foot_adj_run
         elif self.state == 'hit':
-            i = min(self.frame, len(self.HIT_FRAMES) - 1)
-            left, bottom, width, height = self.HIT_FRAMES[i]
+            frames = self.HIT_FRAMES
+            foot_adj = self.foot_adj_run
         elif self.state == 'die':
-            i = min(self.frame, len(self.DIE_FRAMES) - 1)
-            left, bottom, width, height = self.DIE_FRAMES[i]
+            frames = self.DIE_FRAMES
+            foot_adj = self.foot_adj_die
+
+        i = min(self.frame, len(frames) - 1)
+        left, bottom, width, height = frames[i]
 
         DW, DH = int(width * self.scale), int(height * self.scale)
-        y = sy - (DH - height) // 2 - self.foot_adj
+
+        y = sy - (DH - height) // 2 - foot_adj
 
         self.image.clip_composite_draw(left, bottom, width, height,
                                        0, flip, sx, y, DW, DH)
