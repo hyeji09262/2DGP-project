@@ -47,6 +47,9 @@ inven_panel_img = None
 INVEN_PANEL_SCALE = 0.5
 inv_item_images = {}
 
+hotkey_panel_img = None
+HOTKEY_PANEL_SCALE = 0.5
+
 DROP_TABLE = [
     ('10원',   0.3),
     ('100원', 0.2),
@@ -181,7 +184,7 @@ def init():
     global menu_open, menu_img
     global char_panel_img
     global inven_panel_img, inv_item_images
-
+    global hotkey_panel_img
 
     load_map("henesys", "default")
 
@@ -191,6 +194,8 @@ def init():
     char_panel_img = load_image('사진수집/etc/캐릭터정보.png')
 
     inven_panel_img = load_image('사진수집/etc/인벤2.png')
+
+    hotkey_panel_img = load_image('사진수집/etc/단축키.png')
 
     inv_item_images = {}
 
@@ -679,14 +684,7 @@ def _draw_subwindows():
 
     _draw_inventory_window()
 
-    # 단축키 정보 (O)
-    if ui_hotkey_open:
-        w, h = 500, 240
-        x0 = cw // 2 - w // 2
-        y0 = ch // 2 - h // 2
-        x1 = x0 + w
-        y1 = y0 + h
-        draw_rectangle(x0, y0, x1, y1)
+    _draw_hotkey_window()
 
     # 무기 강화 (P)
     if ui_weapon_open:
@@ -887,6 +885,27 @@ def _draw_inventory_window():
     gold_y = panel_bottom + int(h * 0.10)
 
     font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (0, 0, 0))
+
+def _draw_hotkey_window():
+    if not ui_hotkey_open:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    # 이미지가 없으면 임시 박스만
+    if hotkey_panel_img is None:
+        w, h = 500, 300
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        draw_rectangle(x0, y0, x0 + w, y0 + h)
+        return
+
+    # 패널 위치/크기 (화면 중앙)
+    w = int(hotkey_panel_img.w * HOTKEY_PANEL_SCALE)
+    h = int(hotkey_panel_img.h * HOTKEY_PANEL_SCALE)
+    cx, cy = cw // 2, ch // 2
+
+    hotkey_panel_img.draw(cx, cy, w, h)
 
 
 def finish():
