@@ -19,6 +19,27 @@ DRAW_HITBOX = True
 _collision_grace = 0.0
 COLLIDE_IGNORE_PROB = 0.8
 
+# ==== ESC 메뉴 상태 ====
+menu_open = False          # 메뉴가 열려 있는지
+menu_img = None
+MENU_SCALE = 0.5
+# 메뉴 PNG 이미지
+
+# 메뉴 버튼 영역(마우스 클릭용)
+menu_rect_main = None
+menu_rect_close = None
+menu_rect_char = None      # U : 캐릭터 정보
+menu_rect_inven = None     # I : 인벤토리
+menu_rect_hotkey = None    # O : 단축키 정보
+menu_rect_weapon = None    # P : 무기 강화
+menu_rect_exit = None      # 종료 버튼
+
+# 각 서브창(다음 화면) 열림 여부
+ui_char_open = False       # U
+ui_inven_open = False      # I
+ui_hotkey_open = False     # O
+ui_weapon_open = False     # P
+
 DROP_TABLE = [
     ('10원',   0.3),
     ('100원', 0.2),
@@ -75,6 +96,166 @@ MAPS = {
         "spawn_monsters": True
     },
 }
+def _init_menu_layout():
+    global menu_rect_main, menu_rect_close
+    global menu_rect_char, menu_rect_inven, menu_rect_hotkey, menu_rect_weapon, menu_rect_exit
+
+    if menu_img is None:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    # 실제 화면에 그릴 크기(축소 적용)
+    w = int(menu_img.w * MENU_SCALE)
+    h = int(menu_img.h * MENU_SCALE)
+
+    # 메뉴 전체를 화면 중앙에 배치
+    cx = cw // 2
+    cy = ch // 2
+    x0 = cx - w // 2
+    y0 = cy - h // 2
+    x1 = x0 + w
+    y1 = y0 + h
+    menu_rect_main = (x0, y0, x1, y1)
+
+    close_w = int(w * 0.09)  # 대략적인 비율
+    close_h = close_w
+    cx1 = x1 - int(w * 0.06)
+    cy1 = y1 - int(h * 0.06)
+    cx0 = cx1 - close_w
+    cy0 = cy1 - close_h
+    menu_rect_close = (cx0, cy0, cx1, cy1)
+
+    # 네 개 큰 버튼(캐릭터/U, 인벤/I, 단축키/O, 무기강화/P)
+    btn_w = int(w * 0.36)
+    btn_h = int(h * 0.22)
+
+    # 좌우 열 중심
+    left_cx = x0 + int(w * 0.30)
+    right_cx = x0 + int(w * 0.70)
+
+    top_cy = y0 + int(h * 0.63)
+    bottom_cy = y0 + int(h * 0.35)
+
+    def make_rect(cx, cy):
+        hw = btn_w // 2
+        hh = btn_h // 2
+        return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+    menu_rect_char = make_rect(left_cx, top_cy)  # U : 캐릭터 정보
+    menu_rect_inven = make_rect(right_cx, top_cy)  # I : 인벤토리
+    menu_rect_hotkey = make_rect(left_cx, bottom_cy)  # O : 단축키 정보
+    menu_rect_weapon = make_rect(right_cx, bottom_cy)  # P : 무기 강화
+
+    # 게임 종료 버튼 (오른쪽 아래)
+    exit_w = int(w * 0.22)
+    exit_h = int(h * 0.15)
+    ex1 = x1 - int(w * 0.06)
+    ey0 = y0 + int(h * 0.08)
+    ex0 = ex1 - exit_w
+    ey1 = ey0 + exit_h
+    menu_rect_exit = (ex0, ey0, ex1, ey1)
+
+
+def init():
+    global field, boy, current_map, _transition_cooldown, monsters, items
+    global menu_open, menu_img
+
+    load_map("henesys", "default")
+
+    menu_open = False
+
+    menu_img = load_image('사진수집/etc/메뉴창.png')
+
+    _init_menu_layout()
+
+def _handle_menu_event(event):
+    global menu_open, ui_inven_open, ui_weapon_open
+
+    if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
+        menu_open = False
+        return
+
+    if event.type == SDL_KEYDOWN:
+        if event.key == SDLK_u:
+            menu_open = False
+            ui_char_open = True
+            ui_inven_open = ui_hotkey_open = ui_weapon_open = False
+            print("[MENU] 캐릭터 정보 (U)")
+            return
+        elif event.key == SDLK_i:
+            menu_open = False
+            ui_inven_open = True
+            ui_char_open = ui_hotkey_open = ui_weapon_open = False
+            print("[MENU] 인벤토리 (I)")
+            return
+        elif event.key == SDLK_o:
+            menu_open = False
+            ui_hotkey_open = True
+            ui_char_open = ui_inven_open = ui_weapon_open = False
+            print("[MENU] 단축키 정보 (O)")
+            return
+
+        elif event.key == SDLK_p:
+            menu_open = False
+            ui_weapon_open = True
+            ui_char_open = ui_inven_open = ui_hotkey_open = False
+            print("[MENU] 무기 강화 (P)")
+            return
+
+            # 마우스 왼쪽 클릭
+        if event.type == SDL_MOUSEBUTTONDOWN and event.button == SDL_BUTTON_LEFT:
+            mx, my = event.x, event.y
+
+            # X 버튼
+            if _in_rect(mx, my, menu_rect_close):
+                menu_open = False
+                print("[MENU] 닫기 버튼 클릭")
+                return
+            if _in_rect(mx, my, menu_rect_char):
+                menu_open = False
+                ui_char_open = True
+                ui_inven_open = ui_hotkey_open = ui_weapon_open = False
+                print("[MENU] 캐릭터 정보 클릭")
+                return
+
+                # 인벤토리
+            if _in_rect(mx, my, menu_rect_inven):
+                menu_open = False
+                ui_inven_open = True
+                ui_char_open = ui_hotkey_open = ui_weapon_open = False
+                print("[MENU] 인벤토리 클릭")
+                return
+
+                # 단축키 정보
+            if _in_rect(mx, my, menu_rect_hotkey):
+                menu_open = False
+                ui_hotkey_open = True
+                ui_char_open = ui_inven_open = ui_weapon_open = False
+                print("[MENU] 단축키 정보 클릭")
+                return
+
+                # 무기 강화
+            if _in_rect(mx, my, menu_rect_weapon):
+                menu_open = False
+                ui_weapon_open = True
+                ui_char_open = ui_inven_open = ui_hotkey_open = False
+                print("[MENU] 무기 강화 클릭")
+                return
+
+                # 게임 종료
+            if _in_rect(mx, my, menu_rect_exit):
+                print("[MENU] 게임 종료 클릭")
+                game_framework.quit()
+                return
+
+
+def _in_rect(x, y, rect): #esc 마우스 처리
+    if rect is None:
+        return False
+    x0, y0, x1, y1 = rect
+    return x0 <= x <= x1 and y0 <= y <= y1
+
 
 def load_map(name: str, entry: str = "default"):
     """맵 로드 + 필드/보이 배치"""
@@ -232,17 +413,55 @@ def _draw_portals_debug():
         draw_rectangle(min(sx0, sx1), min(sy0, sy1), max(sx0, sx1), max(sy0, sy1))
 
 def handle_events():
+    global menu_open
+    global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open
+
     event_list = get_events()
     for event in event_list:
         if event.type == SDL_QUIT:
             game_framework.quit()
-        elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-            game_framework.quit()
-        else:
-            boy.handle_event(event)
 
-def init():
-    load_map("henesys", "default")
+        if event.type == SDL_KEYDOWN:
+            if event.key == SDLK_u:
+                ui_char_open = True
+                ui_inven_open = ui_hotkey_open = ui_weapon_open = False
+                menu_open = False
+                print("[GLOBAL] 캐릭터 정보 (U)")
+                continue
+            elif event.key == SDLK_i:
+                ui_inven_open = True
+                ui_char_open = ui_hotkey_open = ui_weapon_open = False
+                menu_open = False
+                print("[GLOBAL] 인벤토리 (I)")
+                continue
+            elif event.key == SDLK_o:
+                ui_hotkey_open = True
+                ui_char_open = ui_inven_open = ui_weapon_open = False
+                menu_open = False
+                print("[GLOBAL] 단축키 정보 (O)")
+                continue
+            elif event.key == SDLK_p:
+                ui_weapon_open = True
+                ui_char_open = ui_inven_open = ui_hotkey_open = False
+                menu_open = False
+                print("[GLOBAL] 무기 강화 (P)")
+                continue
+        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
+            if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
+                ui_char_open = ui_inven_open = ui_hotkey_open = ui_weapon_open = False
+                print("[UI] 서브창 닫기 (ESC)")
+            # 서브창 열려 있을 땐 다른 입력은 무시
+            continue
+        if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
+            menu_open = not menu_open
+            print("ESC pressed, menu_open =", menu_open)
+            continue
+
+        if menu_open:
+            _handle_menu_event(event)
+            continue
+
+        boy.handle_event(event)
 
 
 def _handle_collisions():
@@ -329,7 +548,7 @@ def update():
                     game_world.add_object(item, 1)
                     items.append(item)
 
-                boy.gain_exp(50)
+                boy.gain_exp(10)
 
                 game_world.remove_object(o)
                 if o in monsters:
@@ -352,7 +571,7 @@ def draw():
         l, b, r, t = boy.get_bb()
         sx0, sy0 = field.world_to_screen(l, b)
         sx1, sy1 = field.world_to_screen(r, t)
-        draw_rectangle(sx0, sy0, sx1, sy1)  # 보통 빨간색으로 그려짐
+        draw_rectangle(sx0, sy0, sx1, sy1)
 
         # 몬스터 박스
         for m in _gather_monsters():
@@ -361,6 +580,7 @@ def draw():
             sx1, sy1 = field.world_to_screen(r, t)
             draw_rectangle(sx0, sy0, sx1, sy1)
 
+        # 아이템 박스
         for it in _gather_items():
             l, b, r, t = it.get_bb()
             sx0, sy0 = field.world_to_screen(l, b)
@@ -370,7 +590,87 @@ def draw():
     if boy:
         boy.draw_ui()
 
+    if menu_open and menu_img is not None:
+        cw, ch = get_canvas_width(), get_canvas_height()
+        scaled_w = int(menu_img.w * MENU_SCALE)
+        scaled_h = int(menu_img.h * MENU_SCALE)
+        menu_img.draw(cw // 2, ch // 2, scaled_w, scaled_h)
+
+        # 인벤토리 / 무기 강화 창
+    _draw_subwindows()
+
     update_canvas()
+
+def _draw_round_panel(rect):
+    x0, y0, x1, y1 = rect
+    draw_rectangle(x0, y0, x1, y1)
+
+def _draw_menu():
+    if not menu_open or menu_img is None:
+        return
+
+    if menu_img is None or menu_rect_main is None:
+        # 혹시 이미지 로딩이 실패했는지 확인용
+        x = get_canvas_width() // 2
+        y = get_canvas_height() // 2
+        draw_rectangle(x - 100, y - 50, x + 100, y + 50)
+        return
+
+    x0, y0, x1, y1 = menu_rect_main
+    cx = (x0 + x1) // 2
+    cy = (y0 + y1) // 2
+    menu_img.draw(cx, cy)
+
+    # 디버그: 클릭 영역이 어디인지 확인하고 싶으면 사각형 보여주기
+    # if DRAW_MENU_BOUNDS:
+    #     for rect in [menu_rect_close,
+    #                  menu_rect_char, menu_rect_inven,
+    #                  menu_rect_hotkey, menu_rect_weapon,
+    #                  menu_rect_exit]:
+    #         if rect:
+    #             draw_rectangle(*rect)
+
+def _draw_subwindows():
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    # 캐릭터 정보 (U)
+    if ui_char_open:
+        w, h = 500, 320
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        x1 = x0 + w
+        y1 = y0 + h
+        draw_rectangle(x0, y0, x1, y1)
+
+    # 인벤토리 (I)
+    if ui_inven_open:
+        w, h = 500, 320
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        x1 = x0 + w
+        y1 = y0 + h
+        draw_rectangle(x0, y0, x1, y1)
+
+    # 단축키 정보 (O)
+    if ui_hotkey_open:
+        w, h = 500, 240
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        x1 = x0 + w
+        y1 = y0 + h
+        draw_rectangle(x0, y0, x1, y1)
+
+    # 무기 강화 (P)
+    if ui_weapon_open:
+        w, h = 500, 320
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        x1 = x0 + w
+        y1 = y0 + h
+        draw_rectangle(x0, y0, x1, y1)
+
+
+
 
 
 def finish():
