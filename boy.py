@@ -444,6 +444,7 @@ class Boy:
         self.font = load_font('ENCR10B.TTF', 16)
         self.font_big = load_font('ENCR10B.TTF', 25)
         self.ui_font = load_font('ENCR10B.TTF', 20)
+        self.s_font = load_font('ENCR10B.TTF', 12)
         self.image = load_image('사진수집/character/캐릭터 3.png')
         self.die_image = load_image('사진수집/etc/무덤.png')
 
@@ -488,6 +489,11 @@ class Boy:
         self.max_hp = self.base_max_hp
         self.hp = self.max_hp
         self.alive = True
+
+        self.attack = 15  # 시작 공격력
+        self.attack_power = 15
+
+        self.weapon_level = 1
 
         self.gold = 0
         self.inventory = {}

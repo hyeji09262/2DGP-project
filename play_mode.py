@@ -50,6 +50,11 @@ inv_item_images = {}
 hotkey_panel_img = None
 HOTKEY_PANEL_SCALE = 0.5
 
+weapon_panel_img = None
+WEAPON_PANEL_SCALE = 0.37
+
+last_enchant_msg = ""
+
 DROP_TABLE = [
     ('10원',   0.3),
     ('100원', 0.2),
@@ -185,6 +190,7 @@ def init():
     global char_panel_img
     global inven_panel_img, inv_item_images
     global hotkey_panel_img
+    global weapon_panel_img, last_enchant_msg
 
     load_map("henesys", "default")
 
@@ -198,6 +204,9 @@ def init():
     hotkey_panel_img = load_image('사진수집/etc/단축키.png')
 
     inv_item_images = {}
+
+    weapon_panel_img = load_image('사진수집/etc/무기.png')
+    last_enchant_msg = ""
 
     _init_menu_layout()
 
@@ -501,6 +510,11 @@ def handle_events():
                 print("[GLOBAL] 무기 강화 (P)")
                 continue
 
+        if ui_weapon_open and event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
+            _attempt_weapon_enchant()
+                # boy.handle_event 로 넘기지 않음
+            continue
+
         # ====== 메뉴가 열려 있을 때 마우스 처리 (나중에 버튼 클릭용) ======
         if menu_open:
             # 여기서 _handle_menu_event(event) 같은 걸 부르면 됨
@@ -539,12 +553,12 @@ def _handle_collisions():
             if getattr(m, 'dead', False):
                 continue
 
-            # 🔥 방금 맞은 몬스터는 이번 프레임(또는 짧은 시간) 동안 무시
             if getattr(m, 'hit_cool', 0) > 0:
                 continue
 
             if _overlap(atk_bb, m.get_bb()):
-                m.take_hit(damage=1, from_dir=boy.face_dir)
+                dmg = _get_boy_attack()  # playmode.py 에 이미 만든 헬퍼
+                m.take_hit(damage=dmg, from_dir=boy.face_dir)
                 m.hit_cool = 0.3
 
 def _handle_item_pickup():
@@ -686,14 +700,7 @@ def _draw_subwindows():
 
     _draw_hotkey_window()
 
-    # 무기 강화 (P)
-    if ui_weapon_open:
-        w, h = 500, 320
-        x0 = cw // 2 - w // 2
-        y0 = ch // 2 - h // 2
-        x1 = x0 + w
-        y1 = y0 + h
-        draw_rectangle(x0, y0, x1, y1)
+    _draw_weapon_window()
 
 def _draw_boy_portrait(px, py):
     if boy is None or boy.image is None:
@@ -876,7 +883,7 @@ def _draw_inventory_window():
         # 2) 누적 금액 표시 (맨 아래 흰 박스)
         # ==========================
     gold = getattr(boy, 'gold', 0)
-    gold_str = f'{gold}'
+    gold_str = f"{gold} $"
 
     font = boy.font
 
@@ -884,7 +891,7 @@ def _draw_inventory_window():
     gold_x = cx
     gold_y = panel_bottom + int(h * 0.10)
 
-    font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (0, 0, 0))
+    font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (255, 200, 0))
 
 def _draw_hotkey_window():
     if not ui_hotkey_open:
@@ -906,6 +913,138 @@ def _draw_hotkey_window():
     cx, cy = cw // 2, ch // 2
 
     hotkey_panel_img.draw(cx, cy, w, h)
+
+# ----- 무기 강화 관련 헬퍼 -----
+
+def _get_boy_attack():
+    if hasattr(boy, 'attack'):
+        return boy.attack
+    if hasattr(boy, 'attack_power'):
+        return boy.attack_power
+    return 0
+
+def _set_boy_attack(value):
+    if hasattr(boy, 'attack'):
+        boy.attack = value
+    if hasattr(boy, 'attack_power'):
+        boy.attack_power = value
+
+def _get_enchant_info():
+
+    cur_level = getattr(boy, 'weapon_level', 1)
+    cur_atk = _get_boy_attack()
+
+    start_rate = 1.0  # 100%
+    step = 0.05  # 레벨당 5% 감소
+    rate = start_rate - step * (cur_level - 1)
+    rate = max(0.20, rate)  # 최소 20%
+
+    # 골드 소비: 현재 무기 레벨 * 100
+    cost = 1000 * cur_level
+
+    atk_before = cur_atk
+    atk_after = cur_atk + 5  # 한 번 성공 시 +5
+
+    return cur_level, rate, cost, atk_before, atk_after
+
+def _attempt_weapon_enchant():
+    global last_enchant_msg
+
+    # boy가 죽어있으면 강화 불가
+    if hasattr(boy, 'alive') and not boy.alive:
+        last_enchant_msg = "강화 불가"
+        return
+
+    level, rate, cost, atk_before, atk_after = _get_enchant_info()
+    gold = getattr(boy, 'gold', 0)
+
+    # 골드 부족
+    if gold < cost:
+        last_enchant_msg = f"골드 부족 ({gold}/{cost})"
+        print("[ENCHANT] 골드 부족:", gold, "/", cost)
+        return
+
+    # 골드 차감
+    setattr(boy, 'gold', gold - cost)
+
+    r = random.random()
+    print(f"[ENCHANT] try: level={level}, rate={rate:.2f}, roll={r:.2f}")
+
+    if r < rate:
+        # 성공
+        new_level = level + 1
+        setattr(boy, 'weapon_level', new_level)
+        _set_boy_attack(atk_after)
+        last_enchant_msg = f"강화 성공! Lv.{level} → Lv.{new_level}"
+        print("[ENCHANT] SUCCESS -> level", new_level, "atk", atk_after)
+    else:
+        # 실패 (여기서는 하락/파괴 없음)
+        last_enchant_msg = "강화 실패..."
+        print("[ENCHANT] FAIL")
+
+def _draw_weapon_window():
+    """무기 강화 창 (P / ui_weapon_open)."""
+    if not ui_weapon_open:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    # 이미지 없을 때는 네모만
+    if weapon_panel_img is None:
+        w, h = 400, 600
+        x0 = cw // 2 - w // 2
+        y0 = ch // 2 - h // 2
+        draw_rectangle(x0, y0, x0 + w, y0 + h)
+        return
+
+    # 패널 크기/위치
+    w = int(weapon_panel_img.w * WEAPON_PANEL_SCALE)
+    h = int(weapon_panel_img.h * WEAPON_PANEL_SCALE)
+    cx, cy = cw // 2, ch // 2
+    panel_left   = cx - w // 2
+    panel_bottom = cy - h // 2
+
+    # 배경 패널 이미지
+    weapon_panel_img.draw(cx-10, cy+10, w, h)
+
+    # ======== 안에 들어갈 내용들 ========
+    font = boy.font         # 숫자용
+    big_font = boy.ui_font  # 조금 더 크게 쓰고 싶으면
+    s_font = boy.s_font
+
+    level, rate, cost, atk_before, atk_after = _get_enchant_info()
+    gold = getattr(boy, 'gold', 0)
+
+    # 1) 맨 위 "무기 레벨" 박스 안: 현재 무기 레벨 + 강화 확률
+    level_x = panel_left + int(w * 0.44)
+    level_y = panel_bottom + int(h * 0.64)
+    big_font.draw(level_x, level_y, f"Lv.{level}", (0, 220, 0))
+
+    chance_x = level_x
+    chance_y = panel_bottom + int(h * 0.25)
+    font.draw(chance_x, chance_y, f" {int(rate * 100)}%", (255, 80, 80))
+
+    # 2) 가운데 "강화 전 / 강화 후" 박스: 공격력 값
+    before_x = panel_left + int(w * 0.34)
+    after_x  = panel_left + int(w * 0.64)
+    atk_y    = panel_bottom + int(h * 0.44)
+
+    font.draw(before_x, atk_y, str(atk_before), (0, 0, 0))
+    font.draw(after_x,  atk_y, str(atk_after),  (0, 0, 0))
+
+    # 3) 소모 골드 / 현재 골드
+    cost_y = panel_bottom + int(h * 0.59)
+    s_font.draw(panel_left + int(w * 0.3), cost_y,
+              f"cost  {cost}$", (0, 0, 0))
+    s_font.draw(panel_left + int(w * 0.3), cost_y-20,
+              f"money {gold}$", (0, 0, 0))
+
+    # 4) 맨 아래에 최근 결과 메시지 (성공/실패/골드부족)
+    if last_enchant_msg:
+        msg_y = panel_bottom + int(h * 0.12)
+        font.draw(panel_left + int(w * 0.25), msg_y,
+                  last_enchant_msg, (0, 0, 0))
+
 
 
 def finish():

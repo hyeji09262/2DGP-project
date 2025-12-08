@@ -64,7 +64,7 @@ class Mushroom:
 
         # 상태 / 체력
         self.state = 'run'
-        self.hp = 1
+        self.hp = 50
         self.dead = False
 
         # 피격 넉백
@@ -90,22 +90,28 @@ class Mushroom:
             return self.camera.world_to_screen(self.x, self.y)
         return self.x, self.y
 
-
     def take_hit(self, damage=1, from_dir=1):
+        # 이미 죽었거나 죽는 중이면 무시
         if self.dead or self.state == 'die':
             return
 
-        print("MUSHROOM HIT! hp before =", self.hp)  # 디버그용
+        # 0 이하로 들어오는 값 방지
+        dmg = max(1, int(damage))
 
-        self.hp -= damage
-        self.hit_dir = -from_dir   # 공격자 반대 방향으로 넉백
+        # HP 감소
+        self.hp -= dmg
+        self.hit_dir = -from_dir  # 공격 반대 방향으로 넉백
+
+        # 디버그용 보고 싶으면 유지
+        print(f"[MUSHROOM] hit! dmg={dmg}, hp -> {self.hp}")
 
         if self.hp <= 0:
-            print("MUSHROOM DIE START")
+            # ★ 죽는 모션 시작
             self.state = 'die'
             self.state_t = 0.0
             self.frame = 0
         else:
+            # ★ 피격 모션으로 전환
             self.state = 'hit'
             self.state_t = 0.0
             self.frame = 0
