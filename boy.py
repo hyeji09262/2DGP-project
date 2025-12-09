@@ -40,7 +40,8 @@ class Run:
 
     def do(self):
         self.boy.frame = (self.boy.frame + 1) % 4
-        self.boy.x += self.boy.dir * RUN_SPEED_PPS * game_framework.frame_time
+        speed = RUN_SPEED_PPS * getattr(self.boy, 'speed_mul', 1.0)
+        self.boy.x += self.boy.dir * speed * game_framework.frame_time
 
     def draw(self):
         W, H = 55, 80
@@ -215,11 +216,12 @@ class Jump:
 
     def do(self):
         dt = game_framework.frame_time
+        t = game_framework.frame_time
         self.vy -= self.GRAVITY_PPS * dt
         self.boy.y += self.vy * dt
-        self.boy.air_vy = self.vy
-        self.boy.x += self.hdir * RUN_SPEED_PPS * self.MOVE_RATIO * dt
-        self.boy.frame = (self.boy.frame + 1) % 1
+
+        move_speed = RUN_SPEED_PPS * self.MOVE_RATIO * getattr(self.boy, 'speed_mul', 1.0)
+        self.boy.x += self.hdir * move_speed * dt
 
         if self.boy.camera and hasattr(self.boy.camera, 'ground_y'):
             ground_y = self.boy.camera.ground_y(self.boy.x)
@@ -493,6 +495,12 @@ class Boy:
         self.hp = self.max_hp
         self.alive = True
 
+        self.max_hp = 100
+        self.hp = self.max_hp
+
+        self.speed_mul = 1.0
+        self.speed_buff_timer = 0.0
+
         self.attack = 15  # 시작 공격력
         self.attack_power = 15
 
@@ -630,6 +638,12 @@ class Boy:
             return
 
         self.state_machine.update()
+
+        if self.speed_buff_timer > 0.0:
+            self.speed_buff_timer -= game_framework.frame_time
+            if self.speed_buff_timer <= 0.0:
+                self.speed_buff_timer = 0.0
+                self.speed_mul = 1.0
 
         if self.camera and hasattr(self.camera, 'ground_y'):
             if not getattr(self, 'in_air', False):
@@ -932,3 +946,32 @@ class Boy:
         # EXP 숫자 (밑에 회색 글자)
         exp_text = f"EXP {int(self.exp)}/{self.exp_to_next}"
         self.font.draw(hp_x0, exp_y0 - 12, exp_text, (200, 200, 200))
+
+
+    # ---------------- 포션 사용 ----------------
+    def use_red_potion(self):
+        inv = getattr(self, 'inventory', {})
+        cnt = inv.get('레드포션', 0)
+        if cnt <= 0:
+            return  # 없음
+
+        if self.hp <= 0:
+            return  # 죽은 상태면 사용 X
+
+        self.hp = min(self.max_hp, self.hp + 10)
+        inv['레드포션'] = cnt - 1
+
+    def use_blue_potion(self):
+        inv = getattr(self, 'inventory', {})
+        cnt = inv.get('블루포션', 0)
+        if cnt <= 0:
+            return
+
+        if self.hp <= 0:
+            return
+
+        # 5초 동안 1.5배 속도 (원하면 수치 조절)
+        self.speed_mul = 1.5
+        self.speed_buff_timer = 5.0
+        inv['블루포션'] = cnt - 1
+

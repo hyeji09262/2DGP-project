@@ -72,6 +72,14 @@ WEAPON_PANEL_SCALE = 0.37
 last_enchant_msg = ""
 last_enchant_timer = 0.0
 
+potion_bar_img = None
+POTION_BAR_SCALE = 0.15
+
+potion_icons = {}
+
+
+#-----------------------------
+
 DROP_TABLE = [
     ('10원',   0.25),
     ('100원', 0.2),
@@ -211,6 +219,7 @@ def init():
     global inven_panel_img, inv_item_images
     global hotkey_panel_img
     global weapon_panel_img, last_enchant_msg, enchant_msg_img
+    global potion_bar_img, potion_icons
 
     load_map("henesys", "default")
 
@@ -229,6 +238,9 @@ def init():
     last_enchant_msg = ""
 
     enchant_msg_img = load_image('사진수집/etc/강화박스.png')
+
+    potion_bar_img = load_image('사진수집/etc/포션바.png')
+    potion_icons = {}
 
     _init_menu_layout()
 
@@ -509,6 +521,15 @@ def handle_events():
                 print("[GLOBAL] 무기 강화 (P)")
                 continue
 
+            if event.type == SDL_KEYDOWN:
+                if (not menu_open) and (not (ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open)):
+                    if event.key == SDLK_1:
+                        boy.use_red_potion()
+                        continue
+                    if event.key == SDLK_2:
+                        boy.use_blue_potion()
+                        continue
+
         if ui_weapon_open and event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
             _attempt_weapon_enchant()
                 # boy.handle_event 로 넘기지 않음
@@ -643,6 +664,7 @@ def draw():
     game_world.render()
     _draw_portals_debug()
 
+
     if DRAW_HITBOX and field:
         # 캐릭터 박스
         l, b, r, t = boy.get_bb()
@@ -667,6 +689,8 @@ def draw():
     if boy:
         boy.draw_ui()
 
+    _draw_potion_bar()
+
     if menu_open and menu_img is not None:
         cw, ch = get_canvas_width(), get_canvas_height()
         scaled_w = int(menu_img.w * MENU_SCALE)
@@ -675,6 +699,7 @@ def draw():
         _draw_menu_bounds()
 
     _draw_subwindows()
+
 
     update_canvas()
 
@@ -1192,7 +1217,104 @@ def _handle_subwindow_mouse(event):
         print("[UI] 무기강화창 X 클릭 → 닫기")
         return
 
+def _get_potion_icon(kind):
+    if kind not in potion_icons:
+        path = ITEM_IMAGES.get(kind, None)
+        if path:
+            try:
+                potion_icons[kind] = load_image(path)
+            except:
+                potion_icons[kind] = None
+    return potion_icons.get(kind, None)
 
+def _get_potion_icon(kind):
+    """ITEM_IMAGES 에서 포션 아이콘 로딩해서 캐시"""
+    if kind not in potion_icons:
+        path = ITEM_IMAGES.get(kind, None)
+        if path:
+            try:
+                potion_icons[kind] = load_image(path)
+            except:
+                potion_icons[kind] = None
+    return potion_icons.get(kind, None)
+
+
+def _draw_potion_bar():
+    if boy is None:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    # -------------------------------------------------
+    # 1) 포션바 전체 위치(왼쪽 아래 기준)
+    #    👉 이 두 값만 바꾸면 바 전체가 움직여!
+    # -------------------------------------------------
+    base_x = -30  # 화면 왼쪽에서 떨어진 정도
+    base_y = -20 # 화면 아래에서 떨어진 정도
+
+    # -------------------------------------------------
+    # 2) 포션바 배경 그리기
+    # -------------------------------------------------
+    if potion_bar_img:
+        w = int(potion_bar_img.w * POTION_BAR_SCALE)   # 바 크기
+        h = int(potion_bar_img.h * POTION_BAR_SCALE)
+
+        cx = base_x + w // 2
+        cy = base_y + h // 2
+        potion_bar_img.draw(cx, cy, w, h)
+    else:
+        # 이미지 없을 때 임시 박스
+        w, h = 400, 150
+        cx = base_x + w // 2
+        cy = base_y + h // 2
+        draw_rectangle(base_x, base_y, base_x + w, base_y + h)
+
+    # -------------------------------------------------
+    # 3) 슬롯 위치(바 안에서의 상대 위치)
+    #    👉 여기 값을 바꾸면 슬롯/아이콘만 움직임
+    # -------------------------------------------------
+    slot_y = base_y + int(h * 0.4)   # 슬롯 세로 위치
+
+    slot1_x = base_x + int(w * 0.36)  # 1번 슬롯 가로
+    slot2_x = base_x + int(w * 0.63)  # 2번 슬롯 가로
+
+    # -------------------------------------------------
+    # 4) 아이콘 그리기
+    # -------------------------------------------------
+    red_img = _get_potion_icon('레드포션')
+    blue_img = _get_potion_icon('블루포션')
+
+    icon_scale = 0.22  # 아이콘 크기 비율
+
+    if red_img:
+        iw = int(red_img.w * icon_scale)
+        ih = int(red_img.h * icon_scale)
+        red_img.draw(slot1_x, slot_y, iw, ih)
+
+    if blue_img:
+        iw = int(blue_img.w * icon_scale)
+        ih = int(blue_img.h * icon_scale)
+        blue_img.draw(slot2_x, slot_y, iw, ih)
+
+    # -------------------------------------------------
+    # 5) 개수 숫자 (아이콘 오른쪽 아래)
+    #    👉 여기 값을 바꾸면 숫자 위치만 미세 조정 가능
+    # -------------------------------------------------
+    inv = getattr(boy, 'inventory', {})
+    red_cnt = inv.get('레드포션', 0)
+    blue_cnt = inv.get('블루포션', 0)
+
+    font = boy.font
+
+    num_offset_x = 18   # 아이콘 기준 오른쪽으로 얼마나
+    num_offset_y = -2  # 아이콘 기준 아래로 얼마나
+
+    font.draw(slot1_x + num_offset_x,
+              slot_y + num_offset_y,
+              str(red_cnt), (0, 0, 0))
+    font.draw(slot2_x + num_offset_x,
+              slot_y + num_offset_y,
+              str(blue_cnt), (0, 0, 0))
 
 
 
