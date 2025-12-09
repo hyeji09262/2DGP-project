@@ -81,12 +81,21 @@ potion_icon_imgs = {}
 
 #-----------------------------
 
-DROP_TABLE = [
+DROP_TABLE_MUSHROOM = [
     ('10원',   0.25),
     ('100원', 0.2),
     ('1000원',    0.1),
     ('5000원',    0.05),
     ('주황버섯의 갓',   0.2),
+    ('빨간포션', 0.1),
+    ('파란포션', 0.1),
+]
+
+DROP_TABLE_AXE = [
+    ('100원', 0.25),
+    ('1000원',    0.2),
+    ('5000원',    0.1),
+    ('장작',   0.25),
     ('빨간포션', 0.1),
     ('파란포션', 0.1),
 ]
@@ -399,7 +408,7 @@ def load_map(name: str, entry: str = "default"):
     items.clear()
 
     for layer in game_world.world:
-        layer[:] = [o for o in layer if not isinstance(o, Mushroom)]
+        layer[:] = [o for o in layer if not isinstance(o, (Mushroom, Axe))]
     monsters.clear()
 
     for layer in game_world.world:
@@ -411,7 +420,7 @@ def load_map(name: str, entry: str = "default"):
     # 새 버섯 무작위 소환
     if data.get("spawn_monsters", False):
         width = data["width"]
-        cnt = random.randint(5, 10)
+        cnt = random.randint(8, 10)
         for _ in range(cnt):
             x = random.randint(0, width)
             y = field.ground_y(x) if hasattr(field, "ground_y") else 0
@@ -453,15 +462,15 @@ def _gather_items():
                 res.append(o)
     return res
 
-def _choose_drop_kind():
+def _choose_drop_kind(table):
     r = random.random()   # 0.0 ~ 1.0
     acc = 0.0
-    for kind, p in DROP_TABLE:
+    for kind, p in table:
         acc += p
         if r < acc:
             return kind
     # 혹시 합이 1.0이 안 맞아도 마지막 거 반환
-    return DROP_TABLE[-1][0]
+    return table[-1][0]
 
 def _keep_boy_in_world():
     if not field:
@@ -716,6 +725,19 @@ def update():
                     items.append(item)
 
                 boy.gain_exp(10)
+
+            if isinstance(o, Axe) and getattr(o, 'dead', False):
+                    # Axe는 드랍 확률 90%로 (원하면 조절)
+                if random.random() < 0.9:
+                    drop_x = o.x
+                    drop_y = o.y + 20
+                    kind = _choose_drop_kind(DROP_TABLE_AXE)
+                    print('[PLAYMODE] SPAWN DROP (AXE):', kind, 'at', drop_x, drop_y)
+                    item = DropItem(drop_x, drop_y, field=field, kind=kind)
+                    game_world.add_object(item, 1)
+                    items.append(item)
+
+                boy.gain_exp(20)
 
                 respawn_delay = 3.0
                 respawn_x = o.x

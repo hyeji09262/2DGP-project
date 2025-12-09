@@ -426,6 +426,9 @@ class Axe:
                                        0, flip, sx, y, DW, DH)
 
     def get_bb(self):
+        if self.state == 'die' or self.dead:
+            return (0, 0, 0, 0)
+
         w, h = 80, 100
         S = self.SCALE
 
@@ -436,7 +439,7 @@ class Axe:
         half_h = int(h * S * bb_scale_h) // 2
 
         cx = self.x
-        cy = self.y - self.bb_offset_y
+        cy = self.y - self.bb_offset_y  # ← 이거 중요
 
         return (cx - half_w, cy - half_h,
                 cx + half_w, cy + half_h)
