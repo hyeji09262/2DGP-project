@@ -344,6 +344,9 @@ def load_map(name: str, entry: str = "default"):
     if hasattr(field, "ground_y"):
         boy.y = field.ground_y(boy.x)
 
+    boy.spawn_x = boy.x
+    boy.spawn_y = boy.y
+
     if entry == "from_right":
         boy.x -= 40
     elif entry == "from_left":
@@ -614,6 +617,15 @@ def _handle_item_pickup():
 def update():
     global _collision_grace, last_enchant_timer, last_enchant_msg
     game_world.update()
+
+    if boy and getattr(boy, 'want_respawn_home', False):
+        boy.want_respawn_home = False
+        # 원하는 맵과 스폰 entry로 바꾸면 됨
+        load_map("henesys", "default")
+
+    if field and hasattr(field, "ground_y") and not getattr(boy, 'in_air', False):
+        boy.y = field.ground_y(boy.x)
+
     if field and hasattr(field, "ground_y") and not getattr(boy, 'in_air', False):
         boy.y = field.ground_y(boy.x)
 

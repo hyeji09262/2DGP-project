@@ -53,6 +53,7 @@ class Mushroom:
         self.foot_adj_die = self.FOOT_ADJ_DIE
         self.bb_offset_y = self.FRAME_BB_OFFSET_Y
 
+
         self.image = load_image(SHEET_PATH)
         self.camera = None
         if field:

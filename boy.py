@@ -502,6 +502,8 @@ class Boy:
         self.dead_anim_t = 0.0
         self.dead_anim_duration = 1.0
 
+        self.want_respawn_home = False
+
         self.base_max_hp = 100
         self.max_hp = self.base_max_hp
         self.hp = self.max_hp
@@ -1019,12 +1021,11 @@ class Boy:
         self.up_pressed = False
         self.dir = 0
 
-        # 발 밑 땅에 붙이기
-        if self.camera and hasattr(self.camera, 'ground_y'):
-            self.y = self.camera.ground_y(self.x)
-        else:
-            self.y = self.base_ground_y
+        #    "마을로 보내줘" 플래그만 세운다
+        self.want_respawn_home = True
 
         # 상태머신을 Idle로 강제 전환
         self.state_machine.cur_state = self.IDLE
         self.IDLE.enter(('RESPAWN', 0))
+
+
