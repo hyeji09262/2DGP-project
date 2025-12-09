@@ -749,7 +749,7 @@ class Boy:
             DW, DH = int(W * S), int(H * S)
 
             foot_fix = (DH - H) // 2
-            y = sy - foot_fix - self.foot_idle_adj
+            y = sy - foot_fix - self.foot_idle_adj -10
 
             flip = '' if self.face_dir == -1 else 'h'
 
