@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT, get_canvas_width, get_canvas_height, draw_rectangle)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT, SDLK_1, SDLK_2,  get_canvas_width, get_canvas_height, draw_rectangle)
 
 import game_framework
 from state_machine import StateMachine
@@ -10,6 +10,8 @@ RUN_SPEED_KMPH = 25.0 # Km / Hour
 RUN_SPEED_MPM = (RUN_SPEED_KMPH * 1000.0 / 60.0)
 RUN_SPEED_MPS = (RUN_SPEED_MPM / 60.0)
 RUN_SPEED_PPS = (RUN_SPEED_MPS * PIXEL_PER_METER)
+BLUE_POTION_ADD_SEC = 10.0
+BLUE_POTION_MAX_SEC = 30.0 #최대
 
 
 def right_down(e):
@@ -317,6 +319,8 @@ class Attack:
         dt = game_framework.frame_time
         self.t += dt
 
+        speed_mul = getattr(self.boy, 'attack_speed_mul', 1.5)
+
         if self.air_attack:
             self.vy -= Jump.GRAVITY_PPS * dt
             self.boy.y += self.vy * dt
@@ -500,7 +504,12 @@ class Boy:
 
         self.speed_mul = 1.0
         self.speed_buff_timer = 0.0
+        self.attack_speed_mul = 1.0
 
+        self.speed_buff_duration = 10.0
+        self.speed_buff_timer = 0.0
+
+        self.blue_potion_icon = load_image('사진수집/etc/파란물약.png')
         self.attack = 15  # 시작 공격력
         self.attack_power = 15
 
@@ -509,9 +518,13 @@ class Boy:
         self.gold = 0
         self.inventory = {}
 
+        self.inventory = {}
+        self.speed_buff_timer = 0.0
+        self.base_speed = RUN_SPEED_PPS  # 기본 달리기 속도
+        self.speed_mul = 1.0
+
         self.hp_bar_img = load_image('사진수집/etc/hp_bar_red.png')  # 빨간 바
         self.exp_bar_img = load_image('사진수집/etc/exp_bar_green.png')  # 초록 바
-
 
         self.inventory = {
             '10원': 0,
@@ -619,9 +632,9 @@ class Boy:
 
 
     def update(self):
-
+        dt = game_framework.frame_time
         if not self.alive:
-            dt = game_framework.frame_time
+
             self.dead_anim_t += dt
 
             if self.camera and hasattr(self.camera, 'ground_y'):
@@ -639,11 +652,12 @@ class Boy:
 
         self.state_machine.update()
 
-        if self.speed_buff_timer > 0.0:
-            self.speed_buff_timer -= game_framework.frame_time
-            if self.speed_buff_timer <= 0.0:
+        if self.speed_buff_timer > 0:
+            self.speed_buff_timer -= dt
+            if self.speed_buff_timer <= 0:
                 self.speed_buff_timer = 0.0
                 self.speed_mul = 1.0
+                self.attack_speed_mul = 1.0
 
         if self.camera and hasattr(self.camera, 'ground_y'):
             if not getattr(self, 'in_air', False):
@@ -654,6 +668,13 @@ class Boy:
             self.if_timer -= game_framework.frame_time
             if self.if_timer < 0:
                 self.if_timer = 0.0
+
+        if self.speed_buff_timer > 0:
+            self.speed_buff_timer -= game_framework.frame_time
+            if self.speed_buff_timer <= 0:
+                self.speed_buff_timer = 0.0
+                self.speed_mul = 1.0
+                self.attack_speed_mul = 1.0
 
 
     def handle_event(self, event):
@@ -676,6 +697,12 @@ class Boy:
             elif event.key == SDLK_z:
                 self.pick_pressed = True
 
+            elif event.key == SDLK_1:
+                self.use_red_potion()
+
+            elif event.key == SDLK_2:
+                self.use_blue_potion()
+
         elif event.type == SDL_KEYUP:
             if event.key == SDLK_LEFT:
                 self.left_pressed = False
@@ -696,9 +723,6 @@ class Boy:
 
             elif event.key == SDLK_z:
                 self.pick_pressed = False
-
-
-
 
     def draw(self):
         if not self.alive:
@@ -947,31 +971,54 @@ class Boy:
         exp_text = f"EXP {int(self.exp)}/{self.exp_to_next}"
         self.font.draw(hp_x0, exp_y0 - 12, exp_text, (200, 200, 200))
 
+        if self.speed_buff_timer > 0:
+            # 아이콘 위치 (화면 왼쪽 위에서 약간 안쪽)
+            icon_x = 40
+            icon_y = ch - 40
 
-    # ---------------- 포션 사용 ----------------
+            # 아이콘 크기(원하면 조절)
+            iw = int(self.blue_potion_icon.w * 0.3)
+            ih = int(self.blue_potion_icon.h * 0.3)
+
+            self.blue_potion_icon.draw(icon_x, icon_y, iw, ih)
+
+            # 남은 시간(초) – 10,9,8,...1 이런 느낌으로
+            # 소수점 있으면 올림해서 보이게
+            remain = int(self.speed_buff_timer) + 1
+            if remain < 0:
+                remain = 0
+
+            # 숫자 위치는 아이콘 오른쪽에
+            time_x = icon_x + iw // 2 + 15
+            time_y = icon_y - 5
+
+            # 글자 색은 하얀색 + 테두리처럼 두 번 그려도 됨
+            self.ui_font.draw(time_x - 1, time_y - 1, f"{remain}s", (0, 0, 0))
+            self.ui_font.draw(time_x, time_y, f"{remain}s", (0, 200, 255))
+
     def use_red_potion(self):
-        inv = getattr(self, 'inventory', {})
-        cnt = inv.get('레드포션', 0)
-        if cnt <= 0:
-            return  # 없음
+        # 인벤에 빨간포션 없으면 취소
+        if self.inventory.get('빨간포션', 0) <= 0:
+            print("빨간포션 없음")
+            return
 
-        if self.hp <= 0:
-            return  # 죽은 상태면 사용 X
-
-        self.hp = min(self.max_hp, self.hp + 10)
-        inv['레드포션'] = cnt - 1
+        self.inventory['빨간포션'] -= 1
+        self.hp = min(self.max_hp, self.hp + 20)  # 20 회복
+        print("빨간포션 사용, hp =", self.hp, "/", self.max_hp)
 
     def use_blue_potion(self):
-        inv = getattr(self, 'inventory', {})
-        cnt = inv.get('블루포션', 0)
-        if cnt <= 0:
+        if self.inventory.get('파란포션', 0) <= 0:
+            print("파란포션 없음")
             return
 
-        if self.hp <= 0:
-            return
+        self.inventory['파란포션'] -= 1
 
-        # 5초 동안 1.5배 속도 (원하면 수치 조절)
-        self.speed_mul = 1.5
-        self.speed_buff_timer = 5.0
-        inv['블루포션'] = cnt - 1
-
+        if self.speed_buff_timer > 0:
+            self.speed_buff_timer += BLUE_POTION_ADD_SEC
+            # 최대 시간 제한
+            if self.speed_buff_timer > BLUE_POTION_MAX_SEC:
+                self.speed_buff_timer = BLUE_POTION_MAX_SEC
+        else:
+            # 처음 버프 시작
+            self.speed_buff_timer = BLUE_POTION_ADD_SEC
+            self.speed_buff_mult = 1.5
