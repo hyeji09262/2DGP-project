@@ -676,82 +676,108 @@ def _handle_item_pickup():
 
 
 def update():
-    global _collision_grace, last_enchant_timer, last_enchant_msg
-    game_world.update()
+    global _collision_grace, last_enchant_timer, last_enchant_msg, respawn_tasks
+
     dt = game_framework.frame_time
+
+    game_world.update()
 
     if boy and getattr(boy, 'want_respawn_home', False):
         boy.want_respawn_home = False
-        # 원하는 맵과 스폰 entry로 바꾸면 됨
         load_map("henesys", "default")
-
-    if field and hasattr(field, "ground_y") and not getattr(boy, 'in_air', False):
-        boy.y = field.ground_y(boy.x)
 
     if field and hasattr(field, "ground_y") and not getattr(boy, 'in_air', False):
         boy.y = field.ground_y(boy.x)
 
     field.update()
 
-    _check_portal_transition(game_framework.frame_time)
+    _check_portal_transition(dt)
 
     if _collision_grace > 0:
-        _collision_grace -= game_framework.frame_time
+        _collision_grace -= dt
 
     _keep_boy_in_world()
     _handle_collisions()
     _handle_item_pickup()
 
-    _update_respawns(dt)
-
     if last_enchant_timer > 0:
-        last_enchant_timer -= game_framework.frame_time
+        last_enchant_timer -= dt
         if last_enchant_timer <= 0:
             last_enchant_timer = 0
             last_enchant_msg = ""
 
     for layer in game_world.world:
         for o in list(layer):
-            # 몬스터 죽으면 드랍 생성 + 몬스터 제거
+
             if isinstance(o, Mushroom) and getattr(o, 'dead', False):
-                # 드랍 확률
-                if random.random() < 0.9:
+
+                if random.random() < 0.8:
                     drop_x = o.x
                     drop_y = o.y + 20
-                    kind = _choose_drop_kind()
-                    print('[PLAYMODE] SPAWN DROP:', kind, 'at', drop_x, drop_y)
+                    kind = _choose_drop_kind(DROP_TABLE_MUSHROOM)
                     item = DropItem(drop_x, drop_y, field=field, kind=kind)
                     game_world.add_object(item, 1)
                     items.append(item)
 
                 boy.gain_exp(10)
 
-            if isinstance(o, Axe) and getattr(o, 'dead', False):
-                    # Axe는 드랍 확률 90%로 (원하면 조절)
-                if random.random() < 0.9:
+                # 3초 후 다시 소환 예약 (현재 맵에서만)
+                respawn_tasks.append([3.0, 'mushroom', o.x])
+
+                game_world.remove_object(o)
+                if o in monsters:
+                    monsters.remove(o)
+            elif isinstance(o, Axe) and getattr(o, 'dead', False):
+
+                if random.random() < 0.8:
                     drop_x = o.x
                     drop_y = o.y + 20
                     kind = _choose_drop_kind(DROP_TABLE_AXE)
-                    print('[PLAYMODE] SPAWN DROP (AXE):', kind, 'at', drop_x, drop_y)
                     item = DropItem(drop_x, drop_y, field=field, kind=kind)
                     game_world.add_object(item, 1)
                     items.append(item)
 
                 boy.gain_exp(20)
 
-                respawn_delay = 3.0
-                respawn_x = o.x
-                respawn_tasks.append([respawn_delay, respawn_x])
+                # Axe는 5초 후 다시 소환하되, 필드3(예: "map3")에서만
+                if current_map == "map3":
+                    respawn_tasks.append([3.0, 'axe', o.x])
 
                 game_world.remove_object(o)
                 if o in monsters:
                     monsters.remove(o)
 
             if isinstance(o, DropItem) and getattr(o, 'expired', False):
-                print('[PLAYMODE] REMOVE EXPIRED DROP:', o.kind)
                 game_world.remove_object(o)
                 if o in items:
                     items.remove(o)
+
+    for task in list(respawn_tasks):
+        task[0] -= dt   # 남은 시간 감소
+        if task[0] <= 0:
+            _, kind, x = task
+            respawn_tasks.remove(task)
+
+            if kind == 'axe' and current_map != "map3":
+                continue
+
+            if kind == 'mushroom':
+                y = field.ground_y(x) if hasattr(field, 'ground_y') else 0
+                m = Mushroom(x, y, field=field)
+
+            elif kind == 'axe':
+                y = field.ground_y(x) if hasattr(field, 'ground_y') else 0
+                m = Axe(x, y, field=field)
+
+            else:
+                continue
+
+            m.set_camera(field)
+            m.set_world_bounds(0, getattr(field, 'bg_w', 1000))
+            m.dir = random.choice([-1, 1])
+
+            game_world.add_object(m, 1)
+            monsters.append(m)
 
 
 def draw():
