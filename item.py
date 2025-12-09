@@ -30,10 +30,14 @@ class DropItem:
             self.scale = 0.13  # 갓은 조금 더 크게
         elif kind == '빨간포션':
             self.scale = 0.3
+        elif kind == '파란포션':
+            self.scale = 0.3
         else:
             self.scale = default_scale
 
         self.ground_offset = -60
+
+        self.flip_h = (kind == '파란포션')
 
         # 이미지 로드
         path = ITEM_IMAGES.get(kind, ITEM_IMAGES['주황버섯의 갓'])
@@ -81,7 +85,15 @@ class DropItem:
         w = int(self.image.w * S)
         h = int(self.image.h * S)
 
-        self.image.draw(sx, sy, w, h)
+        if self.flip_h:
+            self.image.clip_composite_draw(
+                0, 0, self.image.w, self.image.h,
+                0, 'h',
+                sx, sy, w, h
+            )
+        else:
+            # 나머지 아이템은 그대로
+            self.image.draw(sx, sy, w, h)
 
     def get_bb(self):
         r = self.bb_r
