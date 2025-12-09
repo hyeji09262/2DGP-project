@@ -220,6 +220,7 @@ def init():
     global hotkey_panel_img
     global weapon_panel_img, last_enchant_msg, enchant_msg_img
     global potion_bar_img, potion_icons
+    global  game_over_img
 
     load_map("henesys", "default")
 
@@ -241,6 +242,8 @@ def init():
 
     potion_bar_img = load_image('사진수집/etc/포션바.png')
     potion_icon_imgs = {}
+
+    game_over_img = load_image('사진수집/etc/부활키.png')
 
     _init_menu_layout()
 
@@ -310,7 +313,6 @@ def _in_rect(x, y, rect): #esc 마우스 처리
 
 
 def load_map(name: str, entry: str = "default"):
-    """맵 로드 + 필드/보이 배치"""
     global field, boy, current_map, _collision_grace
     data = MAPS[name]
     current_map = name
@@ -664,6 +666,13 @@ def draw():
     game_world.render()
     _draw_portals_debug()
 
+
+    if hasattr(boy, 'alive') and not boy.alive:
+        GAME_OVER_SCALE = 0.3
+        cw, ch = get_canvas_width(), get_canvas_height()
+        w = int(game_over_img.w * GAME_OVER_SCALE)
+        h = int(game_over_img.h * GAME_OVER_SCALE)
+        game_over_img.draw(cw // 2, ch // 2 + 50, w, h)
 
     if DRAW_HITBOX and field:
         # 캐릭터 박스

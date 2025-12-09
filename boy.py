@@ -1,5 +1,5 @@
 from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SDL_KEYUP,
-                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT, SDLK_1, SDLK_2,  get_canvas_width, get_canvas_height, draw_rectangle)
+                    SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT, SDLK_1, SDLK_2, SDLK_SPACE, get_canvas_width, get_canvas_height, draw_rectangle)
 
 import game_framework
 from state_machine import StateMachine
@@ -474,6 +474,10 @@ class Boy:
         self.alive = True
 
         self.x, self.y = 500, 340
+
+        self.spawn_x = self.x
+        self.spawn_y = self.y
+
         self.base_ground_y = self.y
         self.in_air = False
 
@@ -494,12 +498,16 @@ class Boy:
         self.exp = 0
         self.exp_to_next = 100
 
+        self.alive = True
+        self.dead_anim_t = 0.0
+        self.dead_anim_duration = 1.0
+
         self.base_max_hp = 100
         self.max_hp = self.base_max_hp
         self.hp = self.max_hp
         self.alive = True
 
-        self.max_hp = 100
+        self.max_hp = 5
         self.hp = self.max_hp
 
         self.speed_mul = 1.0
@@ -630,24 +638,17 @@ class Boy:
             return self.camera.world_to_screen(self.x, self.y)
         return self.x, self.y
 
-
     def update(self):
         dt = game_framework.frame_time
-        if not self.alive:
 
+        if not self.alive:
             self.dead_anim_t += dt
 
+            # 바닥에 붙은 상태 유지
             if self.camera and hasattr(self.camera, 'ground_y'):
                 self.y = self.camera.ground_y(self.x)
-
-                # 죽는 애니 끝났는지 체크 (원하면 나중에 사용)
-            total_frames = len(self.DIE_FRAMES)
-            if not self.DIE_LOOP:
-                max_t = total_frames / self.DIE_FPS
-                if self.dead_anim_t >= max_t:
-                    self.dead_anim_t = max_t
-                    self.dead_anim_done = True
-
+            else:
+                self.y = self.base_ground_y
             return
 
         self.state_machine.update()
@@ -659,26 +660,23 @@ class Boy:
                 self.speed_mul = 1.0
                 self.attack_speed_mul = 1.0
 
+
         if self.camera and hasattr(self.camera, 'ground_y'):
             if not getattr(self, 'in_air', False):
                 ground = self.camera.ground_y(self.x)
                 self.y = ground
 
+
         if self.if_timer > 0:
-            self.if_timer -= game_framework.frame_time
+            self.if_timer -= dt
             if self.if_timer < 0:
                 self.if_timer = 0.0
 
-        if self.speed_buff_timer > 0:
-            self.speed_buff_timer -= game_framework.frame_time
-            if self.speed_buff_timer <= 0:
-                self.speed_buff_timer = 0.0
-                self.speed_mul = 1.0
-                self.attack_speed_mul = 1.0
-
-
     def handle_event(self, event):
-        if not self.alive:
+        if not getattr(self, 'alive', True):
+            if (event.type == SDL_KEYDOWN and event.key == SDLK_SPACE
+                    and self.dead_anim_t >= self.dead_anim_duration):
+                self.respawn()
             return
 
         self.state_machine.handle_state_event(('INPUT', event))
@@ -729,11 +727,10 @@ class Boy:
             sx, sy = self.screen_xy()
 
             # 죽는 애니 프레임 계산
-            frames = self.DIE_FRAMES  # [(left,bottom,w,h), ...]
+            frames = self.DIE_FRAMES
             if not frames:
-                # 프레임 아직 안 잡았으면 일단 통짜로 그리기
                 self.die_image.draw(sx, sy)
-                return# 프레임 정의 아직 안 했으면 그냥 안 그림
+                return
 
             index = int(self.dead_anim_t * self.DIE_FPS)
 
@@ -895,19 +892,18 @@ class Boy:
         print(f"[PLAYER] NEXT EXP = {self.exp_to_next}")
 
     def draw_ui(self):
-
         cw = get_canvas_width()
         ch = get_canvas_height()
 
-        # 바 크기 설정 (원하는대로 크기 조절)
-        hp_bar_width = 300  # 가로 길이
+        # === 바 크기 설정 ===
+        hp_bar_width = 300  # HP 바 가로 길이
         hp_bar_height = 20  # HP 바 두께
         exp_bar_height = 10  # EXP 바 두께
 
         # 화면 중앙 아래 정렬
         center_x = cw // 2
         hp_x0 = center_x - hp_bar_width // 2
-        hp_y0 = 40  # 화면 맨 아래에서 40픽셀 위
+        hp_y0 = 40  # 화면 아래에서 얼마나 띄울지
         hp_y1 = hp_y0 + hp_bar_height
 
         # === HP 비율 ===
@@ -915,29 +911,27 @@ class Boy:
         hp_ratio = max(0.0, min(1.0, hp_ratio))
         cur_hp_width = int(hp_bar_width * hp_ratio)
 
-        # === HP 바 빨간색 채우기 ===
+        # === HP 채워진 부분 (빨간 바 이미지) ===
         if cur_hp_width > 0:
             hp_center_x = hp_x0 + cur_hp_width // 2
             hp_center_y = (hp_y0 + hp_y1) // 2
-
-            # 빨간 바 이미지를 현재 체력 비율만큼 가로로 늘려서 그림
             self.hp_bar_img.draw(hp_center_x, hp_center_y,
                                  cur_hp_width, hp_bar_height)
 
-        # HP 바 테두리 (빨간 선이라도 상관없으면 draw_rectangle 계속 써도 됨)
+        # HP 바 테두리
         draw_rectangle(hp_x0, hp_y0, hp_x0 + hp_bar_width, hp_y1)
 
         # === 왼쪽에 큰 레벨 표시 ===
         lv_text = f"Lv.{self.level}"
-        lv_x = hp_x0 - 80  # 더 왼쪽으로 빼고 싶으면 숫자 늘리기
+        lv_x = hp_x0 - 80
         lv_y = hp_y0 + 2
         self.font_big.draw(lv_x, lv_y, lv_text, (255, 255, 0))
 
-        # HP 숫자(작은 글씨) – 바 위에 흰색으로
+        # HP 숫자 (위쪽 흰 글씨)
         hp_text = f"{self.hp}/{self.max_hp}"
         self.font.draw(hp_x0, hp_y1 + 10, hp_text, (255, 255, 255))
 
-        # === EXP 바 (초록색) ===
+        # === EXP 바 ===
         exp_y0 = hp_y0 - 16
         exp_y1 = exp_y0 + exp_bar_height
         exp_center_y = (exp_y0 + exp_y1) // 2
@@ -949,50 +943,38 @@ class Boy:
         exp_ratio = max(0.0, min(1.0, exp_ratio))
         cur_exp_width = int(hp_bar_width * exp_ratio)
 
-        # 1) 배경 프레임 느낌으로 연한 초록 바 전체 길이 그리기
+        # 바 전체 배경 (연한 느낌 내고 싶으면 그냥 한 번만 그림)
         full_center_x = hp_x0 + hp_bar_width // 2
-        try:
-            self.exp_bar_img.opacify(0.5)  # 연하게 (투명)
-            self.exp_bar_img.draw(full_center_x, exp_center_y,
-                                  hp_bar_width, exp_bar_height)
-            self.exp_bar_img.opacify(1.0)  # 다시 원래 불투명으로
-        except:
-            # opacify 지원 안 되면 그냥 한 번만 그려도 됨
-            self.exp_bar_img.draw(full_center_x, exp_center_y,
-                                  hp_bar_width, exp_bar_height)
+        self.exp_bar_img.draw(full_center_x, exp_center_y,
+                              hp_bar_width, exp_bar_height)
 
-            # 2) 실제 채워지는 부분 (진한 초록)
+        # 실제 채워지는 부분
         if cur_exp_width > 0:
             fill_center_x = hp_x0 + cur_exp_width // 2
             self.exp_bar_img.draw(fill_center_x, exp_center_y,
                                   cur_exp_width, exp_bar_height)
 
-        # EXP 숫자 (밑에 회색 글자)
+        # EXP 숫자
         exp_text = f"EXP {int(self.exp)}/{self.exp_to_next}"
         self.font.draw(hp_x0, exp_y0 - 12, exp_text, (200, 200, 200))
 
+        # === 파란 포션 버프 아이콘 & 남은 시간 ===
         if self.speed_buff_timer > 0:
-            # 아이콘 위치 (화면 왼쪽 위에서 약간 안쪽)
             icon_x = 40
             icon_y = ch - 40
 
-            # 아이콘 크기(원하면 조절)
             iw = int(self.blue_potion_icon.w * 0.3)
             ih = int(self.blue_potion_icon.h * 0.3)
-
             self.blue_potion_icon.draw(icon_x, icon_y, iw, ih)
 
-            # 남은 시간(초) – 10,9,8,...1 이런 느낌으로
-            # 소수점 있으면 올림해서 보이게
             remain = int(self.speed_buff_timer) + 1
             if remain < 0:
                 remain = 0
 
-            # 숫자 위치는 아이콘 오른쪽에
             time_x = icon_x + iw // 2 + 15
             time_y = icon_y - 5
 
-            # 글자 색은 하얀색 + 테두리처럼 두 번 그려도 됨
+            # 테두리처럼 두 번 그리기
             self.ui_font.draw(time_x - 1, time_y - 1, f"{remain}s", (0, 0, 0))
             self.ui_font.draw(time_x, time_y, f"{remain}s", (0, 200, 255))
 
@@ -1022,3 +1004,27 @@ class Boy:
             # 처음 버프 시작
             self.speed_buff_timer = BLUE_POTION_ADD_SEC
             self.speed_buff_mult = 1.5
+
+    def respawn(self):
+        # 체력/상태 리셋
+        self.hp = self.max_hp
+        self.alive = True
+        self.dead_anim_t = 0.0
+        self.if_timer = 0.0
+        self.in_air = False
+
+        # 방향/이동 입력 초기화
+        self.left_pressed = False
+        self.right_pressed = False
+        self.up_pressed = False
+        self.dir = 0
+
+        # 발 밑 땅에 붙이기
+        if self.camera and hasattr(self.camera, 'ground_y'):
+            self.y = self.camera.ground_y(self.x)
+        else:
+            self.y = self.base_ground_y
+
+        # 상태머신을 Idle로 강제 전환
+        self.state_machine.cur_state = self.IDLE
+        self.IDLE.enter(('RESPAWN', 0))
