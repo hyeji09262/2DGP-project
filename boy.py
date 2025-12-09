@@ -509,7 +509,7 @@ class Boy:
         self.hp = self.max_hp
         self.alive = True
 
-        self.max_hp = 5
+        self.max_hp = 100
         self.hp = self.max_hp
 
         self.speed_mul = 1.0
@@ -987,7 +987,7 @@ class Boy:
             return
 
         self.inventory['빨간포션'] -= 1
-        self.hp = min(self.max_hp, self.hp + 20)  # 20 회복
+        self.hp = min(self.max_hp, self.hp + 10)  # 20 회복
         print("빨간포션 사용, hp =", self.hp, "/", self.max_hp)
 
     def use_blue_potion(self):

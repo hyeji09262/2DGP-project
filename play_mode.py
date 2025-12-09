@@ -19,6 +19,7 @@ DRAW_HITBOX = True
 _collision_grace = 0.0
 COLLIDE_IGNORE_PROB = 0.8
 enchant_msg_img = None
+respawn_tasks = []
 
 
 # ==== ESC 메뉴 상태 ====
@@ -131,13 +132,39 @@ MAPS = {
             "from_left": (120, 40),
             "from_right":(970, 450),
         },
-        # 맨 오른쪽 포털 → henesys의 왼쪽으로 들어감
         "portals": [
-            {"rect": (950, 100, 1000, 200), "to": "henesys", "entry": "from_left",  "require_up": True}
+            # 오른쪽 포탈: 헤네시스로
+            {"rect": (950, 100, 1000, 200), "to": "henesys", "entry": "from_left", "require_up": True},
+
+            # 왼쪽 포탈: 새 맵 map3으로
+            {"rect": (20, 100, 70, 200), "to": "map3", "entry": "from_right", "require_up": True}
+        ],
+        "spawn_monsters": True
+    },
+    "map3": {
+        "image": "사진수집/background/헤네필드/헤네필드2.png",  # 같은 배경 재사용
+        "width": 1000,
+        "ground": [
+            (0, 167),
+            (240, 167),
+            (350, 227),
+            (725, 227),
+            (825, 167),
+            (1000, 167)
+        ],
+        "spawn": {
+             "default":   (275, 40),
+            "from_left": (120, 40),
+            "from_right":(970, 450),
+        },
+        # 오른쪽 포탈: 다시 map2로 되돌아가기
+        "portals": [
+            {"rect": (950, 100, 1000, 200), "to": "map2", "entry": "from_left", "require_up": True}
         ],
         "spawn_monsters": True
     },
 }
+
 
 def _fmt_num(n, max_digits=6):
     try:
@@ -379,19 +406,38 @@ def load_map(name: str, entry: str = "default"):
         layer[:] = [o for o in layer if not isinstance(o, DropItem)]
     items.clear()
 
+    respawn_tasks.clear()
+
     # 새 버섯 무작위 소환
     if data.get("spawn_monsters", False):
         width = data["width"]
         cnt = random.randint(5, 10)
+
+        SAFE_DIST = 120  # 플레이어랑 최소 이 거리 이상 떨어져서 스폰
+
         for _ in range(cnt):
-            x = random.randint(0, width)
+            # 플레이어랑 너무 가까우면 다시 뽑기
+            for _try in range(10):
+                x = random.randint(0, width)
+                if abs(x - boy.x) > SAFE_DIST:
+                    break  # OK
             y = field.ground_y(x) if hasattr(field, "ground_y") else 0
+
             m = Mushroom(x, y, field=field)
             m.set_world_bounds(0, width)
-            # 방향 랜덤
             m.dir = random.choice([-1, 1])
+
+            # 🔹 map3는 더 강한 몬스터
+            if name == "map3":
+                if hasattr(m, 'max_hp'):
+                    m.max_hp *= 2
+                    m.hp = m.max_hp
+                if hasattr(m, 'contact_damage'):
+                    m.contact_damage = getattr(m, 'contact_damage', 1) * 2
+
             game_world.add_object(m, 1)
             monsters.append(m)
+
 
 def set_boy(b: Boy):
     global boy
@@ -566,10 +612,13 @@ def _handle_collisions():
         return
 
     # 1) 몬스터 → 플레이어 (플레이어가 맞는 쪽)
-    if getattr(boy, 'if_timer', 0) <= 0:   # 무적 아닐 때만
+    airborne = getattr(boy, 'in_air', False)
+
+    # 1) 몬스터 → 플레이어 (플레이어가 맞는 쪽)
+    #    점프 중(airborne) 이면 맞지 않음
+    if (not airborne) and getattr(boy, 'if_timer', 0) <= 0:
         bb_b = boy.get_bb()
         for m in _gather_monsters():
-            # 죽었거나 죽는 중인 몬스터는 무시
             if getattr(m, 'dead', False):
                 continue
             if getattr(m, 'state', None) == 'die':
@@ -580,6 +629,20 @@ def _handle_collisions():
                 damage = getattr(m, 'contact_damage', 1)
                 boy.take_hit(from_dir, damage=damage)
                 return
+
+    # 2) 플레이어 공격 → 몬스터 피격 (점프 공격은 그대로 유지)
+    if getattr(boy, 'attack_active', False):
+        atk_bb = boy.get_attack_bb()
+        for m in _gather_monsters():
+            if getattr(m, 'dead', False):
+                continue
+            if getattr(m, 'hit_cool', 0) > 0:
+                continue
+
+            if _overlap(atk_bb, m.get_bb()):
+                dmg = _get_boy_attack()
+                m.take_hit(damage=dmg, from_dir=boy.face_dir)
+                m.hit_cool = 0.3
 
     # 2) 플레이어 공격 → 몬스터 피격
     if getattr(boy, 'attack_active', False):
@@ -617,6 +680,7 @@ def _handle_item_pickup():
 def update():
     global _collision_grace, last_enchant_timer, last_enchant_msg
     game_world.update()
+    dt = game_framework.frame_time
 
     if boy and getattr(boy, 'want_respawn_home', False):
         boy.want_respawn_home = False
@@ -640,6 +704,8 @@ def update():
     _handle_collisions()
     _handle_item_pickup()
 
+    _update_respawns(dt)
+
     if last_enchant_timer > 0:
         last_enchant_timer -= game_framework.frame_time
         if last_enchant_timer <= 0:
@@ -647,11 +713,11 @@ def update():
             last_enchant_msg = ""
 
     for layer in game_world.world:
-        for o in list(layer):  # 복사본 돌면서 제거
+        for o in list(layer):
             # 몬스터 죽으면 드랍 생성 + 몬스터 제거
             if isinstance(o, Mushroom) and getattr(o, 'dead', False):
-                # 드랍 확률 (원하면 수정)
-                if random.random() < 0.7:
+                # 드랍 확률
+                if random.random() < 0.9:
                     drop_x = o.x
                     drop_y = o.y + 20
                     kind = _choose_drop_kind()
@@ -661,6 +727,10 @@ def update():
                     items.append(item)
 
                 boy.gain_exp(10)
+
+                respawn_delay = 3.0
+                respawn_x = o.x
+                respawn_tasks.append([respawn_delay, respawn_x])
 
                 game_world.remove_object(o)
                 if o in monsters:
@@ -1341,6 +1411,35 @@ def _draw_potion_bar():
         text_y = int(cy_slot - (ih * 0.3))
 
         font.draw(text_x, text_y, cnt_str, (0, 0, 0))
+
+def _update_respawns(dt):
+    global respawn_tasks
+
+    if field is None:
+        return
+
+    world_w = MAPS.get(current_map, {}).get("width", 1000)
+
+    for task in list(respawn_tasks):
+        task[0] -= dt                  # 남은 시간 감소
+        if task[0] <= 0:
+            _, x = task
+            # 맵 범위 안으로 클램프
+            x = max(0, min(world_w, int(x)))
+            y = field.ground_y(x) if hasattr(field, "ground_y") else 0
+
+            m = Mushroom(x, y, field=field)
+            m.set_world_bounds(0, world_w)
+            m.dir = random.choice([-1, 1])
+
+            game_world.add_object(m, 1)
+            monsters.append(m)
+
+            respawn_tasks.remove(task)
+
+
+
+
 
 
 def finish():
