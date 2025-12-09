@@ -445,6 +445,9 @@ class Boy:
         self.font_big = load_font('ENCR10B.TTF', 25)
         self.ui_font = load_font('ENCR10B.TTF', 20)
         self.s_font = load_font('ENCR10B.TTF', 12)
+        self.kr_font = load_font('NanumGothicBold.ttf', 15)
+        self.skr_font = load_font('NanumGothicBold.ttf', 13)
+
         self.image = load_image('사진수집/character/캐릭터 3.png')
         self.die_image = load_image('사진수집/etc/무덤.png')
 

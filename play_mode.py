@@ -900,13 +900,13 @@ def _draw_inventory_window():
         # 2) 누적 금액 표시 (맨 아래 흰 박스)
         # ==========================
     gold = getattr(boy, 'gold', 0)
-    gold_str = f"{gold} $"
+    gold_str = f"{gold} G"
 
-    font = boy.font
+    font = boy.kr_font
 
         # 아래 하얀 바 중앙쯤
-    gold_x = cx
-    gold_y = panel_bottom + int(h * 0.10)
+    gold_x = cx+40
+    gold_y = panel_bottom + int(h * 0.105)
 
     font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (255, 200, 0))
 
@@ -1049,7 +1049,8 @@ def _draw_weapon_window():
     # ======== 안에 들어갈 내용들 ========
     font = boy.font         # 숫자용
     big_font = boy.ui_font  # 조금 더 크게 쓰고 싶으면
-    s_font = boy.s_font
+    skr_font = boy.skr_font
+    kr_font = boy.kr_font
 
     level, rate, cost, atk_before, atk_after = _get_enchant_info()
     gold = getattr(boy, 'gold', 0)
@@ -1073,16 +1074,24 @@ def _draw_weapon_window():
 
     # 3) 소모 골드 / 현재 골드
     cost_y = panel_bottom + int(h * 0.59)
-    s_font.draw(panel_left + int(w * 0.3), cost_y,
-              f"cost  {cost}$", (0, 0, 0))
-    s_font.draw(panel_left + int(w * 0.3), cost_y-20,
-              f"money {gold}$", (0, 0, 0))
+    skr_font.draw(panel_left + int(w * 0.3), cost_y,
+              f"비용     {cost} G", (0, 0, 0))
+    skr_font.draw(panel_left + int(w * 0.3), cost_y-20,
+              f"보유 골드   {gold} G", (0, 0, 0))
 
     # 4) 맨 아래에 최근 결과 메시지 (성공/실패/골드부족)
     if last_enchant_msg:
-        msg_y = panel_bottom + int(h * 0.12)
-        font.draw(panel_left + int(w * 0.25), msg_y,
-                  last_enchant_msg, (0, 0, 0))
+        msg_font = boy.kr_font  # 좀 큰 폰트
+        msg = last_enchant_msg
+
+        # 패널 안에서 가로 중앙, 세로는 가운데보다 약간 위
+        msg_x = cx - int(w * 0.19)
+        msg_y = panel_bottom + int(h * 0.52)
+
+        # 그림자 먼저 (검은색)
+        msg_font.draw(msg_x + 2, msg_y - 2, msg, (0, 0, 0))
+        # 본문 (노란색)
+        msg_font.draw(msg_x, msg_y, msg, (255, 255, 0))
 
 def _draw_menu_bounds():
     if not menu_open:
