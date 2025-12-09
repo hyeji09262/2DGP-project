@@ -18,6 +18,8 @@ items = []
 DRAW_HITBOX = True
 _collision_grace = 0.0
 COLLIDE_IGNORE_PROB = 0.8
+enchant_msg_img = None
+
 
 # ==== ESC 메뉴 상태 ====
 menu_open = False          # 메뉴가 열려 있는지
@@ -60,6 +62,7 @@ weapon_panel_img = None
 WEAPON_PANEL_SCALE = 0.37
 
 last_enchant_msg = ""
+last_enchant_timer = 0.0
 
 DROP_TABLE = [
     ('10원',   0.3),
@@ -197,7 +200,7 @@ def init():
     global char_panel_img
     global inven_panel_img, inv_item_images
     global hotkey_panel_img
-    global weapon_panel_img, last_enchant_msg
+    global weapon_panel_img, last_enchant_msg, enchant_msg_img
 
     load_map("henesys", "default")
 
@@ -214,6 +217,8 @@ def init():
 
     weapon_panel_img = load_image('사진수집/etc/무기.png')
     last_enchant_msg = ""
+
+    enchant_msg_img = load_image('사진수집/etc/강화박스.png')
 
     _init_menu_layout()
 
@@ -574,7 +579,7 @@ def _handle_item_pickup():
 
 
 def update():
-    global _collision_grace
+    global _collision_grace, last_enchant_timer, last_enchant_msg
     game_world.update()
     if field and hasattr(field, "ground_y") and not getattr(boy, 'in_air', False):
         boy.y = field.ground_y(boy.x)
@@ -589,6 +594,12 @@ def update():
     _keep_boy_in_world()
     _handle_collisions()
     _handle_item_pickup()
+
+    if last_enchant_timer > 0:
+        last_enchant_timer -= game_framework.frame_time
+        if last_enchant_timer <= 0:
+            last_enchant_timer = 0
+            last_enchant_msg = ""
 
     for layer in game_world.world:
         for o in list(layer):  # 복사본 돌면서 제거
@@ -891,9 +902,9 @@ def _draw_inventory_window():
 
             # 개수 숫자 (오른쪽 아래에 작게)
         count_str = str(cnt)
-        font = boy.font
-        font.draw(int(cx_slot + slot_w * 0.15),
-                    int(cy_slot - slot_h * 0.25),
+        font = boy.s_font
+        font.draw(int(cx_slot + slot_w * 0.18),
+                    int(cy_slot - slot_h * 0.23),
                     count_str, (0, 0, 0))
 
         # ==========================
@@ -970,7 +981,7 @@ def _get_enchant_info():
     rate = max(0.20, rate)  # 최소 20%
 
     # 골드 소비: 현재 무기 레벨 * 100
-    cost = 1000 * cur_level
+    cost = 10 * cur_level
 
     atk_before = cur_atk
     atk_after = cur_atk + 5  # 한 번 성공 시 +5
@@ -978,11 +989,12 @@ def _get_enchant_info():
     return cur_level, rate, cost, atk_before, atk_after
 
 def _attempt_weapon_enchant():
-    global last_enchant_msg
+    global last_enchant_msg,  last_enchant_timer
 
     # boy가 죽어있으면 강화 불가
     if hasattr(boy, 'alive') and not boy.alive:
         last_enchant_msg = "강화 불가"
+        last_enchant_timer = 0.8
         return
 
     level, rate, cost, atk_before, atk_after = _get_enchant_info()
@@ -991,6 +1003,7 @@ def _attempt_weapon_enchant():
     # 골드 부족
     if gold < cost:
         last_enchant_msg = f"골드 부족 ({gold}/{cost})"
+        last_enchant_timer = 0.8
         print("[ENCHANT] 골드 부족:", gold, "/", cost)
         return
 
@@ -1005,11 +1018,13 @@ def _attempt_weapon_enchant():
         new_level = level + 1
         setattr(boy, 'weapon_level', new_level)
         _set_boy_attack(atk_after)
-        last_enchant_msg = f"강화 성공! Lv.{level} → Lv.{new_level}"
+        last_enchant_msg = f"강화 성공! Lv.{new_level}"
+        last_enchant_timer = 0.8
         print("[ENCHANT] SUCCESS -> level", new_level, "atk", atk_after)
     else:
         # 실패 (여기서는 하락/파괴 없음)
         last_enchant_msg = "강화 실패..."
+        last_enchant_timer = 0.8
         print("[ENCHANT] FAIL")
 
 def _draw_weapon_window():
@@ -1080,18 +1095,34 @@ def _draw_weapon_window():
               f"보유 골드   {gold} G", (0, 0, 0))
 
     # 4) 맨 아래에 최근 결과 메시지 (성공/실패/골드부족)
-    if last_enchant_msg:
-        msg_font = boy.kr_font  # 좀 큰 폰트
+    if last_enchant_msg and last_enchant_timer > 0:
+        msg_font = boy.kr_font
         msg = last_enchant_msg
 
-        # 패널 안에서 가로 중앙, 세로는 가운데보다 약간 위
-        msg_x = cx - int(w * 0.19)
-        msg_y = panel_bottom + int(h * 0.52)
+        msg_cx = panel_left + int(w * 0.3)
+        msg_cy = panel_bottom + int(h * 0.5)
 
-        # 그림자 먼저 (검은색)
-        msg_font.draw(msg_x + 2, msg_y - 2, msg, (0, 0, 0))
-        # 본문 (노란색)
-        msg_font.draw(msg_x, msg_y, msg, (255, 255, 0))
+        if enchant_msg_img:
+            bw = int(enchant_msg_img.w * 0.35)
+            bh = int(enchant_msg_img.h * 0.3)
+            enchant_msg_img.draw(msg_cx, msg_cy, bw, bh)
+        else:
+            # 이미지 없으면 임시 네모 박스
+            bw = int(w * 0.5)
+            bh = int(h * 0.12)
+            bx0 = msg_cx - bw // 2
+            by0 = msg_cy - bh // 2
+            bx1 = msg_cx + bw // 2
+            by1 = msg_cy + bh // 2
+            draw_rectangle(bx0, by0, bx1, by1)
+
+            # 글자 위치 (말풍선 안 중앙 조금 위)
+        text_x = msg_cx - len(msg) * 1 # 길이에 따라 살짝 왼쪽으로
+        text_y = msg_cy +10
+
+        # 테두리용 검정 + 본문 노란 글씨
+        msg_font.draw(text_x + 1, text_y - 1, msg, (0, 0, 0))
+        msg_font.draw(text_x, text_y, msg, (500, 0, 0))
 
 def _draw_menu_bounds():
     if not menu_open:
