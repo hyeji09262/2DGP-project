@@ -6,7 +6,7 @@ import game_world
 
 from boy import Boy
 from field import Field
-from monster import Mushroom
+from monster import Mushroom, Axe
 from item import DropItem, ITEM_IMAGES
 
 field = None
@@ -412,29 +412,18 @@ def load_map(name: str, entry: str = "default"):
     if data.get("spawn_monsters", False):
         width = data["width"]
         cnt = random.randint(5, 10)
-
-        SAFE_DIST = 120  # 플레이어랑 최소 이 거리 이상 떨어져서 스폰
-
         for _ in range(cnt):
-            # 플레이어랑 너무 가까우면 다시 뽑기
-            for _try in range(10):
-                x = random.randint(0, width)
-                if abs(x - boy.x) > SAFE_DIST:
-                    break  # OK
+            x = random.randint(0, width)
             y = field.ground_y(x) if hasattr(field, "ground_y") else 0
 
-            m = Mushroom(x, y, field=field)
+            # 3 맵에서만 Axe 소환
+            if name == "map3":  # 3번 맵 이름에 맞게!
+                m = Axe(x, y, field=field)
+            else:
+                m = Mushroom(x, y, field=field)
+
             m.set_world_bounds(0, width)
             m.dir = random.choice([-1, 1])
-
-            # 🔹 map3는 더 강한 몬스터
-            if name == "map3":
-                if hasattr(m, 'max_hp'):
-                    m.max_hp *= 2
-                    m.hp = m.max_hp
-                if hasattr(m, 'contact_damage'):
-                    m.contact_damage = getattr(m, 'contact_damage', 1) * 2
-
             game_world.add_object(m, 1)
             monsters.append(m)
 
@@ -452,7 +441,7 @@ def _gather_monsters():
     mons = []
     for layer in game_world.world:
         for o in layer:
-            if o.__class__.__name__ == 'Mushroom':
+            if isinstance(o, (Mushroom, Axe)):
                 mons.append(o)
     return mons
 
