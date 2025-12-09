@@ -55,6 +55,13 @@ inven_panel_img = None
 INVEN_PANEL_SCALE = 0.5
 inv_item_images = {}
 
+INV_ICON_SCALES = {
+    '주황버섯의 갓': 0.1,
+    '빨간포션' : 0.28
+    # 나중에 아이템 더 생기면 여기 계속 추가하면 됨
+}
+DEFAULT_INV_ICON_SCALE = 0.1
+
 hotkey_panel_img = None
 HOTKEY_PANEL_SCALE = 0.5
 
@@ -67,9 +74,10 @@ last_enchant_timer = 0.0
 DROP_TABLE = [
     ('10원',   0.3),
     ('100원', 0.2),
-    ('1000원',    0.15),
+    ('1000원',    0.1),
     ('5000원',    0.05),
-    ('주황버섯의 갓',   0.3),
+    ('주황버섯의 갓',   0.25),
+    ('빨간포션', 0.1)
 ]
 
 MAPS = {
@@ -814,6 +822,7 @@ def _draw_char_window():
     font.draw(num_x, attack_y, atk_s, (0, 0, 0))
 
 def _draw_inventory_window():
+
     global inven_x_rect
 
     if not ui_inven_open:
@@ -863,20 +872,19 @@ def _draw_inventory_window():
             continue
         inv_list.append((kind, cnt))
         # 4 x 5 슬롯 (위 그림 기준)
-    cols, rows = 4, 5
+    cols, rows = 3, 5
     max_slots = cols * rows
 
         #내부 그리드 영역 (패널 비율로 계산)
-    grid_left = panel_left + int(w * 0.22)
-    grid_right = panel_left + int(w * 0.82)
+    grid_left = panel_left + int(w * 0.18)
+    grid_right = panel_left + int(w * 0.8)
     grid_bottom = panel_bottom + int(h * 0.16)
     grid_top = panel_bottom + int(h * 0.82)
 
     slot_w = (grid_right - grid_left) / cols
     slot_h = (grid_top - grid_bottom) / rows
 
-        # 아이콘 크기 비율
-    icon_scale = 0.1
+
 
     for idx in range(min(len(inv_list), max_slots)):
         kind, cnt = inv_list[idx]
@@ -895,9 +903,10 @@ def _draw_inventory_window():
         if img is None:
             continue
 
-            # 아이콘 그리기
-        iw = int(img.w * icon_scale)
-        ih = int(img.h * icon_scale)
+        scale = INV_ICON_SCALES.get(kind, DEFAULT_INV_ICON_SCALE)
+
+        iw = int(img.w * scale)
+        ih = int(img.h * scale)
         img.draw(int(cx_slot), int(cy_slot), iw, ih)
 
             # 개수 숫자 (오른쪽 아래에 작게)
@@ -916,7 +925,7 @@ def _draw_inventory_window():
     font = boy.kr_font
 
         # 아래 하얀 바 중앙쯤
-    gold_x = cx+40
+    gold_x = cx
     gold_y = panel_bottom + int(h * 0.105)
 
     font.draw(gold_x - len(gold_str) * 4, gold_y, gold_str, (255, 200, 0))
