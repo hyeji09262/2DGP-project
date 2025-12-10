@@ -14,6 +14,8 @@ field = None
 boy = None
 current_map = None
 npc = None
+mingming_quest_state = MingMing.QUEST_AVAILABLE
+
 _transition_cooldown = 0.0
 monsters = []
 items = []
@@ -365,7 +367,7 @@ def _in_rect(x, y, rect): #esc 마우스 처리
 
 def load_map(name: str, entry: str = "default"):
     global field, boy, current_map, _collision_grace
-    global npc, npcs, current_npc, respawn_tasks
+    global npc, npcs, current_npc, respawn_tasks, mingming_quest_state
 
     data = MAPS[name]
     current_map = name
@@ -422,11 +424,8 @@ def load_map(name: str, entry: str = "default"):
     current_npc = None
 
     # 기존 단일 npc 객체 제거
-    if npc:
-        for layer in game_world.world:
-            if npc in layer:
-                layer.remove(npc)
-        npc = None
+    if npc and isinstance(npc, MingMing):
+        mingming_quest_state = npc.quest_state
 
     # 8) 첫 번째 맵(henesys)에만 NPC 배치
     if name == "henesys":
@@ -434,6 +433,8 @@ def load_map(name: str, entry: str = "default"):
         npc = MingMing(npc_x, npc_y, field)
         game_world.add_object(npc, 1)
         npcs.append(npc)
+    else:
+        npc = None
 
     # 9) 카메라 위치 초기화
     hw, hh = field.VIEW_W / 2, field.VIEW_H / 2
@@ -567,58 +568,102 @@ def handle_events():
 
     event_list = get_events()
     for event in event_list:
-        # 창 닫기
+        # 창 닫기 (윈도우 X)
         if event.type == SDL_QUIT:
             game_framework.quit()
             continue
 
-        # ESC 키
+        # =======================
+        # ESC : 서브창/퀘스트창 닫기 → 없으면 메뉴 토글
+        # =======================
         if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-            # 서브창/메뉴 다 닫기
-            if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
-                ui_char_open = ui_inven_open = ui_hotkey_open = ui_weapon_open = False
-                print("[UI] 서브창 닫기 (ESC)")
-            else:
-                # 아무 서브창도 안 열려 있으면 메뉴 토글
-                menu_open = not menu_open
-                print("[UI] 메뉴 토글 =", menu_open)
-            continue
-
-        if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-            # 서브창/메뉴 다 닫기
             if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open or ui_quest_open:
                 ui_char_open = ui_inven_open = ui_hotkey_open = ui_weapon_open = ui_quest_open = False
-                print("[UI] 서브창 닫기 (ESC)")
+                print("[UI] 서브창/퀘스트창 닫기 (ESC)")
             else:
                 menu_open = not menu_open
                 print("[UI] 메뉴 토글 =", menu_open)
             continue
 
+        # =======================
+        # U / I / O / P 단축키
+        # =======================
+        if event.type == SDL_KEYDOWN:
+            # 캐릭터 정보 (U)
+            if event.key == SDLK_u:
+                ui_char_open = True
+                ui_inven_open = ui_hotkey_open = ui_weapon_open = ui_quest_open = False
+                menu_open = False
+                print("[GLOBAL] 캐릭터 정보 (U)")
+                continue
+
+            # 인벤토리 (I)
+            if event.key == SDLK_i:
+                ui_inven_open = True
+                ui_char_open = ui_hotkey_open = ui_weapon_open = ui_quest_open = False
+                menu_open = False
+                print("[GLOBAL] 인벤토리 (I)")
+                continue
+
+            # 단축키 정보 (O)
+            if event.key == SDLK_o:
+                ui_hotkey_open = True
+                ui_char_open = ui_inven_open = ui_weapon_open = ui_quest_open = False
+                menu_open = False
+                print("[GLOBAL] 단축키 정보 (O)")
+                continue
+
+            # 무기 강화 (P)
+            if event.key == SDLK_p:
+                ui_weapon_open = True
+                ui_char_open = ui_inven_open = ui_hotkey_open = ui_quest_open = False
+                menu_open = False
+                print("[GLOBAL] 무기 강화 (P)")
+                continue
+
+        # =======================
+        # 무기 강화창에서 SPACE : 강화 시도
+        # =======================
         if ui_weapon_open and event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
             _attempt_weapon_enchant()
-                # boy.handle_event 로 넘기지 않음
+            # boy.handle_event 로 넘기지 않음
             continue
 
+        # =======================
+        # 어떤 서브창(캐릭/인벤/단축키/무기/퀘스트)이 열려 있을 때
+        #  → 마우스 클릭만 처리하고, 게임 조작은 막음
+        # =======================
         if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open or ui_quest_open:
             _handle_subwindow_mouse(event)
             continue
 
-            # ====== NPC 상호작용 (스페이스) ======
+        # =======================
+        # ESC 메뉴가 열려 있을 때 마우스 처리
+        # =======================
+        if menu_open:
+            _handle_menu_event(event)
+            continue
+
+        # =======================
+        # NPC 상호작용 (SPACE)
+        # =======================
         if event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
             if npc and npc.can_talk(boy):
-                # 밍밍 퀘스트 상태에 따라 다르게
+                # 밍밍 퀘스트 상태에 따라 행동
                 if npc.quest_state == MingMing.QUEST_AVAILABLE:
-                    # 퀘스트 설명창 열기
                     ui_quest_open = True
                     current_npc = npc
+                    print("[QUEST] 밍밍 퀘스트 창 열기")
                 elif npc.quest_state == MingMing.QUEST_READY:
-                    # 퀘스트 완료 & 보상 지급
                     _complete_mingming_quest()
-                # 진행중일 때는 can_talk() 에서 False라서 여기까지 안 옴
+                # IN_PROGRESS 인 상태는 can_talk()에서 False라서 여기 안 옴
                 continue
 
-            # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
+        # =======================
+        # 평소 게임 조작(캐릭터 이동/점프/공격 등)
+        # =======================
         boy.handle_event(event)
+
 
 
 
@@ -847,6 +892,8 @@ def draw():
     _draw_subwindows()
 
     _draw_quest_window()
+
+    _draw_quest_tracker()
 
     update_canvas()
 
@@ -1378,10 +1425,12 @@ def _handle_subwindow_mouse(event):
     if ui_quest_open:
         # 수락
         if _in_rect(mx, my, quest_accept_rect):
+            global mingming_quest_state
             ui_quest_open = False
             if current_npc and isinstance(current_npc, MingMing):
                 # 퀘스트 시작
                 current_npc.quest_state = MingMing.QUEST_IN_PROGRESS
+                mingming_quest_state = MingMing.QUEST_IN_PROGRESS  # ★ 전역도 같이
                 boy.current_quest = '밍밍_주황버섯20'
                 print("[QUEST] 밍밍 퀘스트 수락! 주황버섯의 갓 20개 모아오기.")
             return
@@ -1589,8 +1638,7 @@ def _handle_quest_mouse(event):
         return
 
 def _update_mingming_quest():
-    # 밍밍 퀘스트: 주황버섯의 갓 20개
-    global npc
+    global npc, mingming_quest_state
     if not npc or not isinstance(npc, MingMing):
         return
 
@@ -1601,7 +1649,46 @@ def _update_mingming_quest():
     count = boy.inventory.get('주황버섯의 갓', 0)
     if count >= 20:
         npc.quest_state = MingMing.QUEST_READY
+        mingming_quest_state = MingMing.QUEST_READY
         print("[QUEST] 밍밍 퀘스트 완료 가능 상태!")
+
+def _draw_quest_tracker():
+    # 퀘스트 수락 안 했으면 안 그림
+    if not hasattr(boy, 'current_quest'):
+        return
+    if boy.current_quest != '밍밍_주황버섯20':
+        return
+
+    # 밍밍 퀘스트 상태가 DONE 이면 더 이상 안 보여줘도 됨
+    if mingming_quest_state == MingMing.QUEST_DONE:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    # 오른쪽 위에 작은 박스 하나
+    margin = 10
+    w = 220
+    h = 60
+    x1 = cw - margin
+    x0 = x1 - w
+    y1 = ch - margin
+    y0 = y1 - h
+
+    # 배경 박스 (원하면 나중에 이미지로 교체)
+    draw_rectangle(x0, y0, x1, y1)
+
+    # 진행도: 인벤토리에서 주황버섯의 갓 개수 가져오기
+    count = boy.inventory.get('주황버섯의 갓', 0)
+
+    title = "밍밍의 퀘스트"
+    text  = f"주황버섯의 갓 {count}/20"
+
+    # 폰트는 너가 쓰는 한글 폰트 아무거나
+    font = boy.kr_font if hasattr(boy, 'kr_font') else boy.font
+
+    # 글자 출력
+    font.draw(x0 + 10, y1 - 25, title, (255, 255, 0))
+    font.draw(x0 + 10, y1 - 45, text,  (255, 255, 255))
 
 def _complete_mingming_quest():
     global npc
@@ -1612,7 +1699,7 @@ def _complete_mingming_quest():
 
     have = boy.inventory.get('주황버섯의 갓', 0)
     if have < 20:
-        # 혹시 인벤에서 버렸다면 다시 진행중으로 돌릴 수도 있음
+        # 혹시 중간에 버렸으면 다시 진행중으로 돌리거나 그냥 안내만 할 수도 있음
         print("[QUEST] 재료가 모자랍니다.")
         return
 
@@ -1628,7 +1715,6 @@ def _complete_mingming_quest():
     boy.current_quest = None
 
     print("[QUEST] 밍밍 퀘스트 완료! EXP 500, 빨간포션 10개, 골드 5000 획득!")
-
 
 
 
