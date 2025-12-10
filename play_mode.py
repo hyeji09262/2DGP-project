@@ -8,10 +8,12 @@ from boy import Boy
 from field import Field
 from monster import Mushroom, Axe
 from item import DropItem, ITEM_IMAGES
+from npc import MingMing
 
 field = None
 boy = None
 current_map = None
+npc = None
 _transition_cooldown = 0.0
 monsters = []
 items = []
@@ -20,6 +22,16 @@ _collision_grace = 0.0
 COLLIDE_IGNORE_PROB = 0.8
 enchant_msg_img = None
 respawn_tasks = []
+
+npcs = []
+
+ui_quest_open = False
+quest_panel_img = None
+QUEST_PANEL_SCALE = 0.6
+
+quest_accept_rect = None
+quest_decline_rect = None
+current_npc = None
 
 
 # ==== ESC 메뉴 상태 ====
@@ -48,6 +60,7 @@ ui_char_open = False       # U
 ui_inven_open = False      # I
 ui_hotkey_open = False     # O
 ui_weapon_open = False     # P
+ui_quest_open = False
 
 char_panel_img = None
 CHAR_PANEL_SCALE = 0.5
@@ -257,6 +270,7 @@ def init():
     global weapon_panel_img, last_enchant_msg, enchant_msg_img
     global potion_bar_img, potion_icons
     global  game_over_img
+    global quest_panel_img
 
     load_map("henesys", "default")
 
@@ -268,6 +282,7 @@ def init():
     inven_panel_img = load_image('사진수집/etc/인벤2.png')
 
     hotkey_panel_img = load_image('사진수집/etc/단축키.png')
+    quest_panel_img = load_image('사진수집/npc/밍밍퀘스트.png')
 
     inv_item_images = {}
 
@@ -350,23 +365,26 @@ def _in_rect(x, y, rect): #esc 마우스 처리
 
 def load_map(name: str, entry: str = "default"):
     global field, boy, current_map, _collision_grace
+    global npc, npcs, current_npc, respawn_tasks
+
     data = MAPS[name]
     current_map = name
 
+    # 1) 기존 Boy 제거
     for layer in game_world.world:  # world = [[],[],[]]
         layer[:] = [o for o in layer if not isinstance(o, Boy)]
 
-    # 이전 필드 제거
+    # 2) 이전 필드 제거
     if field:
         game_world.remove_object(field)
 
-    # 새 필드 생성
+    # 3) 새 필드 생성
     field = Field(data["image"], lerp=0.15)
     field.VIEW_W, field.VIEW_H = get_canvas_width(), get_canvas_height()
     field.ground_profile = data["ground"][:]  # 지면 포인트 주입
     game_world.add_object(field, 0)
 
-    # 보이 생성/재사용
+    # 4) 보이 생성/재사용
     if not boy:
         set_boy(Boy())
         game_world.add_object(boy, 1)  # depth 1
@@ -374,15 +392,18 @@ def load_map(name: str, entry: str = "default"):
         # boy가 world에 없으면 다시 add (중복 방지)
         if all(boy not in layer for layer in game_world.world):
             game_world.add_object(boy, 1)
-    # 스폰 배치
+
+    # 5) 스폰 배치
     sx, sy = data["spawn"].get(entry, data["spawn"]["default"])
     boy.x, boy.y = sx, sy
     if hasattr(field, "ground_y"):
         boy.y = field.ground_y(boy.x)
 
+    # 부활용 기본 스폰 좌표 기억
     boy.spawn_x = boy.x
     boy.spawn_y = boy.y
 
+    # 포탈 진입 방향 보정
     if entry == "from_right":
         boy.x -= 40
     elif entry == "from_left":
@@ -390,10 +411,32 @@ def load_map(name: str, entry: str = "default"):
 
     _collision_grace = 0.35
 
-    # 카메라 타겟 연결
+    # 6) 카메라 타겟 연결
     boy.set_camera(field)
     field.target = boy
 
+    # 7) 이전 NPC들 정리 (MingMing 전부 제거)
+    for layer in game_world.world:
+        layer[:] = [o for o in layer if not isinstance(o, MingMing)]
+    npcs.clear()
+    current_npc = None
+
+    # 기존 단일 npc 객체 제거
+    if npc:
+        for layer in game_world.world:
+            if npc in layer:
+                layer.remove(npc)
+        npc = None
+
+    # 8) 첫 번째 맵(henesys)에만 NPC 배치
+    if name == "henesys":
+        # 👉 여기서 위치 (800, 400) 고정
+        npc_x, npc_y = 800, field.ground_y(400)
+        npc = MingMing(npc_x, npc_y, field)
+        game_world.add_object(npc, 1)
+        npcs.append(npc)
+
+    # 9) 카메라 위치 초기화
     hw, hh = field.VIEW_W / 2, field.VIEW_H / 2
     max_cx = max(field.bg_w - hw, hw)
     max_cy = max(field.bg_h - hh, hh)
@@ -404,8 +447,12 @@ def load_map(name: str, entry: str = "default"):
         boy.up_pressed = False
 
     field.update()
+
+    # 10) 몬스터/아이템/리스폰 작업 초기화
     monsters.clear()
     items.clear()
+
+    from monster import Mushroom, Axe  # 혹시를 위해 한 번 더
 
     for layer in game_world.world:
         layer[:] = [o for o in layer if not isinstance(o, (Mushroom, Axe))]
@@ -417,7 +464,7 @@ def load_map(name: str, entry: str = "default"):
 
     respawn_tasks.clear()
 
-    # 새 버섯 무작위 소환
+    # 11) 새 몬스터 무작위 소환
     if data.get("spawn_monsters", False):
         width = data["width"]
         cnt = random.randint(8, 10)
@@ -425,8 +472,8 @@ def load_map(name: str, entry: str = "default"):
             x = random.randint(0, width)
             y = field.ground_y(x) if hasattr(field, "ground_y") else 0
 
-            # 3 맵에서만 Axe 소환
-            if name == "map3":  # 3번 맵 이름에 맞게!
+            # 3번 맵에서만 Axe, 나머지는 Mushroom
+            if name == "map3":
                 m = Axe(x, y, field=field)
             else:
                 m = Mushroom(x, y, field=field)
@@ -435,6 +482,7 @@ def load_map(name: str, entry: str = "default"):
             m.dir = random.choice([-1, 1])
             game_world.add_object(m, 1)
             monsters.append(m)
+
 
 
 def set_boy(b: Boy):
@@ -515,7 +563,7 @@ def _draw_portals_debug():
 
 def handle_events():
     global menu_open
-    global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open
+    global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open, ui_quest_open
 
     event_list = get_events()
     for event in event_list:
@@ -536,69 +584,35 @@ def handle_events():
                 print("[UI] 메뉴 토글 =", menu_open)
             continue
 
-        # ====== 서브창 단축키 ======
-        if event.type == SDL_KEYDOWN:
-            # 캐릭터 정보 (U)
-            if event.key == SDLK_u:
-                ui_char_open = True
-                ui_inven_open = ui_hotkey_open = ui_weapon_open = False
-                menu_open = False
-                print("[GLOBAL] 캐릭터 정보 (U)")
-                continue
-
-            # 인벤토리 (I)
-            if event.key == SDLK_i:
-                ui_inven_open = True
-                ui_char_open = ui_hotkey_open = ui_weapon_open = False
-                menu_open = False
-                print("[GLOBAL] 인벤토리 (I)")
-                continue
-
-            # 단축키 정보 (O)
-            if event.key == SDLK_o:
-                ui_hotkey_open = True
-                ui_char_open = ui_inven_open = ui_weapon_open = False
-                menu_open = False
-                print("[GLOBAL] 단축키 정보 (O)")
-                continue
-
-            # 무기 강화 (P)
-            if event.key == SDLK_p:
-                ui_weapon_open = True
-                ui_char_open = ui_inven_open = ui_hotkey_open = False
-                menu_open = False
-                print("[GLOBAL] 무기 강화 (P)")
-                continue
-
-            if event.type == SDL_KEYDOWN:
-                if (not menu_open) and (not (ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open)):
-                    if event.key == SDLK_1:
-                        boy.use_red_potion()
-                        continue
-                    if event.key == SDLK_2:
-                        boy.use_blue_potion()
-                        continue
+        if event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
+            # 서브창/메뉴 다 닫기
+            if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open or ui_quest_open:
+                ui_char_open = ui_inven_open = ui_hotkey_open = ui_weapon_open = ui_quest_open = False
+                print("[UI] 서브창 닫기 (ESC)")
+            else:
+                menu_open = not menu_open
+                print("[UI] 메뉴 토글 =", menu_open)
+            continue
 
         if ui_weapon_open and event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
             _attempt_weapon_enchant()
                 # boy.handle_event 로 넘기지 않음
             continue
 
-        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
+        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open or ui_quest_open:
             _handle_subwindow_mouse(event)
-            # 서브창이 열려 있으면 게임 조작(boy.handle_event)은 막음
+            if ui_quest_open:
+                _handle_quest_mouse(event)
+            # 서브창/퀘스트창 열려 있으면 캐릭터 조작 막기
             continue
 
-        # ====== 메뉴가 열려 있을 때 마우스 처리 (나중에 버튼 클릭용) ======
-        if menu_open:
-            _handle_menu_event(event)
-            continue
-
-        if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open:
-            _handle_subwindow_mouse(event)
-                # 여기서는 캐릭터 움직임 같은 건 막고 UI만 처리
-            continue
-
+        if (not menu_open) and (not (ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open)):
+            # NPC 대화 (스페이스)
+            if event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
+                if npc and npc.is_near(boy):
+                    ui_quest_open = True  # 퀘스트 창 열기
+                    print("[NPC] 퀘스트 대화 열기")
+                    continue
 
             # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
         boy.handle_event(event)
@@ -828,6 +842,7 @@ def draw():
 
     _draw_subwindows()
 
+    _draw_quest_window()
 
     update_canvas()
 
@@ -870,6 +885,8 @@ def _draw_subwindows():
     _draw_hotkey_window()
 
     _draw_weapon_window()
+
+    _draw_quest_window()
 
 def _draw_boy_portrait(px, py):
     if boy is None or boy.image is None:
@@ -1321,7 +1338,7 @@ def _draw_menu_bounds():
         draw_rectangle(*menu_rect_exit)
 
 def _handle_subwindow_mouse(event):
-    global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open
+    global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open, ui_quest_open
     global char_x_rect, inven_x_rect, hotkey_x_rect, weapon_x_rect
 
     if event.type != SDL_MOUSEBUTTONDOWN or event.button != SDL_BUTTON_LEFT:
@@ -1473,6 +1490,70 @@ def _update_respawns(dt):
             monsters.append(m)
 
             respawn_tasks.remove(task)
+
+def _draw_quest_window():
+    global quest_accept_rect, quest_decline_rect
+
+    if not ui_quest_open:
+        return
+    if quest_panel_img is None:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+
+    w = int(quest_panel_img.w * QUEST_PANEL_SCALE)
+    h = int(quest_panel_img.h * QUEST_PANEL_SCALE)
+    cx, cy = cw // 2, ch // 2
+
+    panel_left   = cx - w // 2
+    panel_bottom = cy - h // 2
+
+    quest_panel_img.draw(cx, cy, w, h)
+
+    # 버튼 위치는 이미지 비율로 대충 설정 (필요하면 나중에 숫자 조금씩 조정)
+    # 수락 버튼 (왼쪽 아래 쪽)
+    acc_x0 = panel_left + int(w * 0.25)
+    acc_x1 = panel_left + int(w * 0.45)
+    acc_y0 = panel_bottom + int(h * 0.18)
+    acc_y1 = panel_bottom + int(h * 0.30)
+    quest_accept_rect = (acc_x0, acc_y0, acc_x1, acc_y1)
+
+    # 거절 버튼 (오른쪽 아래 쪽)
+    dec_x0 = panel_left + int(w * 0.55)
+    dec_x1 = panel_left + int(w * 0.75)
+    dec_y0 = acc_y0
+    dec_y1 = acc_y1
+    quest_decline_rect = (dec_x0, dec_y0, dec_x1, dec_y1)
+
+    # 디버그: 버튼 박스 보기
+    # draw_rectangle(*quest_accept_rect)
+    # draw_rectangle(*quest_decline_rect)
+
+def _handle_quest_mouse(event):
+    global ui_quest_open
+
+    if event.type != SDL_MOUSEBUTTONDOWN or event.button != SDL_BUTTON_LEFT:
+        return
+
+    if not ui_quest_open:
+        return
+
+    mx, my = _canvas_mouse_xy(event)
+
+    # 수락 버튼
+    if quest_accept_rect and _in_rect(mx, my, quest_accept_rect):
+        print("[QUEST] 수락")
+        ui_quest_open = False
+        # 여기서 퀘스트 수락 상태를 boy에 붙이고 싶으면:
+        # setattr(boy, 'has_quest', True)
+        return
+
+    # 거절 버튼
+    if quest_decline_rect and _in_rect(mx, my, quest_decline_rect):
+        print("[QUEST] 거절")
+        ui_quest_open = False
+        return
+
 
 
 
