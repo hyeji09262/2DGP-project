@@ -36,6 +36,7 @@ quest_decline_rect = None
 current_npc = None
 
 
+
 # ==== ESC 메뉴 상태 ====
 menu_open = False          # 메뉴가 열려 있는지
 menu_img = None
@@ -87,6 +88,10 @@ WEAPON_PANEL_SCALE = 0.37
 
 last_enchant_msg = ""
 last_enchant_timer = 0.0
+
+quest_reward_msg = ""
+quest_reward_timer = 0.0
+
 
 potion_bar_img = None
 POTION_BAR_SCALE = 0.15
@@ -739,8 +744,15 @@ def _handle_item_pickup():
 
 def update():
     global _collision_grace, last_enchant_timer, last_enchant_msg, respawn_tasks
+    global quest_reward_msg, quest_reward_timer
 
     dt = game_framework.frame_time
+
+    if quest_reward_timer > 0:
+        quest_reward_timer -= dt
+        if quest_reward_timer <= 0:
+            quest_reward_timer = 0
+            quest_reward_msg = ""
 
     game_world.update()
 
@@ -892,6 +904,7 @@ def draw():
     _draw_subwindows()
 
     _draw_quest_window()
+    _draw_quest_notice()
 
     _draw_quest_tracker()
     _draw_esc_hint()
@@ -1587,7 +1600,7 @@ def _draw_quest_window():
     btn_h = int(h * 0.1)
 
     # 수락 버튼 (왼쪽 아래)
-    accept_cx = panel_left + int(w * 0.57)
+    accept_cx = panel_left + int(w * 0.58)
     accept_cy = panel_bottom + int(h * 0.30)
     quest_accept_rect = (
         accept_cx - btn_w // 2,
@@ -1716,6 +1729,8 @@ def _complete_mingming_quest():
 
     print("[QUEST] 밍밍 퀘스트 완료! EXP 500, 빨간포션 10개, 골드 5000 획득!")
 
+    _show_quest_notice("퀘스트 완료! 보상을 획득했습니다.", duration=2.0)
+
 def _draw_esc_hint():
     if boy is None:
         return
@@ -1737,6 +1752,52 @@ def _draw_esc_hint():
     # 테두리(검정) + 본문(흰색) 두 번 그리기
     font.draw(x + 1, y - 1, text, (0, 0, 0))
     font.draw(x,     y,     text, (255, 255,255))
+
+def _show_quest_notice(text, duration=1.5):
+    global quest_reward_msg, quest_reward_timer
+    quest_reward_msg = text
+    quest_reward_timer = duration
+
+def _draw_quest_notice():
+    if quest_reward_timer <= 0:
+        return
+    if boy is None:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+    text = quest_reward_msg or ""
+
+    font = boy.kr_font  # 한글 폰트 사용
+
+    # 문구 위치 (화면 위쪽 중앙쯤)
+    cx = cw // 2 -10
+    cy = ch - 80
+
+    # if enchant_msg_img:
+    #     bw = int(enchant_msg_img.w * 0.6)
+    #     bh = int(enchant_msg_img.h * 0.4)
+    #     enchant_msg_img.draw(cx, cy, bw, bh)
+    # else:
+    #     # 이미지 없으면 그냥 네모 박스
+    #     padding_x = 10
+    #     padding_y = 8
+    #     length = len(text)
+    #     box_w = length * 16 + padding_x * 2
+    #     box_h = 32 + padding_y * 2
+    #     x0 = cx - box_w // 2
+    #     y0 = cy - box_h // 2
+    #     x1 = cx + box_w // 2
+    #     y1 = cy + box_h // 2
+    #     draw_rectangle(x0, y0, x1, y1)
+
+    # 텍스트 그리기 (약간 그림자 효과)
+    text_x = cx - len(text) * 6
+    text_y = cy - 6
+
+    font.draw(text_x + 1, text_y - 1, text, (0, 0, 0))
+    font.draw(text_x,     text_y,     text, (255, 255, 0))
+
+
 
 
 
