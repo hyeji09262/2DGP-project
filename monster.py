@@ -65,7 +65,7 @@ class Mushroom:
 
         # 상태 / 체력
         self.state = 'run'
-        self.hp = 1
+        self.hp = 15
         self.dead = False
 
         # 피격 넉백
@@ -73,7 +73,7 @@ class Mushroom:
         self.hit_back_speed = 200.0
         self.hit_cool = 0.0
 
-        self.contact_damage = 2
+        self.contact_damage = 5
 
     # 카메라(필드) 연결
     def set_camera(self, cam):
@@ -291,7 +291,7 @@ class Axe:
         self.hit_dir = 0
         self.hit_back_speed = 220.0
         self.hit_cool = 0.0
-        self.contact_damage = 4
+        self.contact_damage = 20
 
     def set_camera(self, cam):
         self.camera = cam

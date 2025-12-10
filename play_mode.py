@@ -106,13 +106,13 @@ potion_icon_imgs = {}
 #-----------------------------
 
 DROP_TABLE_MUSHROOM = [
-    ('10원',   0.1),
-    # ('100원', 0.2),
-    # ('1000원',    0.1),
-    # ('5000원',    0.05),
-    ('주황버섯의 갓',   0.9),
-    # ('빨간포션', 0.1),
-    # ('파란포션', 0.1),
+    ('10원',   0.25),
+    ('100원', 0.2),
+    ('1000원',    0.1),
+    ('5000원',    0.05),
+    ('주황버섯의 갓',   0.2),
+    ('빨간포션', 0.1),
+    ('파란포션', 0.1),
 ]
 
 DROP_TABLE_AXE = [
@@ -618,12 +618,12 @@ def _draw_portals():
                 DW, DH
             )
 
-        # ==== 디버그용 충돌 박스 (원하면 끄기) ====
-        if DRAW_HITBOX:
-            sx0, sy0 = field.world_to_screen(x0, y0)
-            sx1, sy1 = field.world_to_screen(x1, y1)
-            draw_rectangle(min(sx0, sx1), min(sy0, sy1),
-                           max(sx0, sx1), max(sy0, sy1))
+        # # ==== 디버그용 충돌 박스 (원하면 끄기) ====
+        # if DRAW_HITBOX:
+        #     sx0, sy0 = field.world_to_screen(x0, y0)
+        #     sx1, sy1 = field.world_to_screen(x1, y1)
+        #     draw_rectangle(min(sx0, sx1), min(sy0, sy1),
+        #                    max(sx0, sx1), max(sy0, sy1))
 
 
 
@@ -947,21 +947,21 @@ def draw():
         l, b, r, t = boy.get_bb()
         sx0, sy0 = field.world_to_screen(l, b)
         sx1, sy1 = field.world_to_screen(r, t)
-        draw_rectangle(sx0, sy0, sx1, sy1)
+        # draw_rectangle(sx0, sy0, sx1, sy1)
 
         # 몬스터 박스
         for m in _gather_monsters():
             l, b, r, t = m.get_bb()
             sx0, sy0 = field.world_to_screen(l, b)
             sx1, sy1 = field.world_to_screen(r, t)
-            draw_rectangle(sx0, sy0, sx1, sy1)
+            # draw_rectangle(sx0, sy0, sx1, sy1)
 
         # 아이템 박스
         for it in _gather_items():
             l, b, r, t = it.get_bb()
             sx0, sy0 = field.world_to_screen(l, b)
             sx1, sy1 = field.world_to_screen(r, t)
-            draw_rectangle(sx0, sy0, sx1, sy1)
+            # draw_rectangle(sx0, sy0, sx1, sy1)
 
     if boy:
         boy.draw_ui()
@@ -984,9 +984,9 @@ def draw():
     _draw_esc_hint()
     update_canvas()
 
-def _draw_round_panel(rect):
-    x0, y0, x1, y1 = rect
-    draw_rectangle(x0, y0, x1, y1)
+# def _draw_round_panel(rect):
+#     x0, y0, x1, y1 = rect
+#     draw_rectangle(x0, y0, x1, y1)
 
 def _draw_menu():
     if not menu_open or menu_img is None:
@@ -996,7 +996,7 @@ def _draw_menu():
         # 혹시 이미지 로딩이 실패했는지 확인용
         x = get_canvas_width() // 2
         y = get_canvas_height() // 2
-        draw_rectangle(x - 100, y - 50, x + 100, y + 50)
+        # draw_rectangle(x - 100, y - 50, x + 100, y + 50)
         return
 
     x0, y0, x1, y1 = menu_rect_main
@@ -1067,8 +1067,8 @@ def _draw_char_window():
         y0 = ch // 2 - h // 2
         x1 = x0 + w
         y1 = y0 + h
-        draw_rectangle(x0, y0, x1, y1)
-        return
+        # draw_rectangle(x0, y0, x1, y1)
+        # return
 
     # 패널 위치/크기
     w = int(char_panel_img.w * CHAR_PANEL_SCALE)
@@ -1086,8 +1086,8 @@ def _draw_char_window():
     y0 = y1 - int(h * 0.10)  # X 버튼 높이 : h * 10%
     char_x_rect = (x0, y0, x1, y1)
 
-    if DRAW_MENU_BOUNDS:
-        draw_rectangle(*char_x_rect)
+    # if DRAW_MENU_BOUNDS:
+    #     draw_rectangle(*char_x_rect)
 
     # -----------------------
     # 1) 왼쪽 초상화 (그림 박스 안 중앙쯤)
@@ -1146,7 +1146,7 @@ def _draw_inventory_window():
         w, h = 300, 500
         x0 = cw // 2 - w // 2
         y0 = ch // 2 - h // 2
-        draw_rectangle(x0, y0, x0 + w, y0 + h)
+        #draw_rectangle(x0, y0, x0 + w, y0 + h)
         return
 
         # 패널 위치/크기
@@ -1165,13 +1165,10 @@ def _draw_inventory_window():
     y0 = y1 - int(h * 0.05)
     inven_x_rect = (x0, y0, x1, y1)
 
-    if DRAW_MENU_BOUNDS:
-        draw_rectangle(*inven_x_rect)
+    # if DRAW_MENU_BOUNDS:
+    #     draw_rectangle(*inven_x_rect)
 
-        # ==========================
-        # 1) 인벤 아이템 그리드
-        #    (돈 제외한 아이템들만)
-        # ==========================
+
     money_kinds = ('10원', '100원', '1000원', '5000원')
 
         # (kind, count) 리스트 만들기
@@ -1218,7 +1215,7 @@ def _draw_inventory_window():
 
         iw = int(img.w * scale)
         ih = int(img.h * scale)
-        if kind == '파란포션':  # ← 너가 ITEM_IMAGES에 쓴 키랑 똑같이!
+        if kind == '파란포션':
             img.clip_composite_draw(
                 0, 0, img.w, img.h,  # 원본 전체
                 0, 'h',  # 회전 0, 수평 뒤집기
@@ -1262,7 +1259,7 @@ def _draw_hotkey_window():
         w, h = 500, 300
         x0 = cw // 2 - w // 2
         y0 = ch // 2 - h // 2
-        draw_rectangle(x0, y0, x0 + w, y0 + h)
+        # draw_rectangle(x0, y0, x0 + w, y0 + h)
         return
 
     # 패널 위치/크기 (화면 중앙)
@@ -1280,8 +1277,8 @@ def _draw_hotkey_window():
     y0 = y1 - int(h * 0.12)
     hotkey_x_rect = (x0, y0, x1, y1)
 
-    if DRAW_MENU_BOUNDS:
-        draw_rectangle(*hotkey_x_rect)
+    # if DRAW_MENU_BOUNDS:
+    #     # draw_rectangle(*hotkey_x_rect)
 
 # ----- 무기 강화 관련 헬퍼 -----
 
@@ -1367,7 +1364,7 @@ def _draw_weapon_window():
         w, h = 400, 600
         x0 = cw // 2 - w // 2
         y0 = ch // 2 - h // 2
-        draw_rectangle(x0, y0, x0 + w, y0 + h)
+        # draw_rectangle(x0, y0, x0 + w, y0 + h)
         return
 
     # 패널 크기/위치
@@ -1386,8 +1383,8 @@ def _draw_weapon_window():
     y0 = y1 - int(h * 0.03)
     weapon_x_rect = (x0, y0, x1, y1)
 
-    if DRAW_MENU_BOUNDS:
-        draw_rectangle(*weapon_x_rect)
+    # if DRAW_MENU_BOUNDS:
+        # draw_rectangle(*weapon_x_rect)
 
     # ======== 안에 들어갈 내용들 ========
     font = boy.font         # 숫자용
@@ -1442,7 +1439,7 @@ def _draw_weapon_window():
             by0 = msg_cy - bh // 2
             bx1 = msg_cx + bw // 2
             by1 = msg_cy + bh // 2
-            draw_rectangle(bx0, by0, bx1, by1)
+            # draw_rectangle(bx0, by0, bx1, by1)
 
             # 글자 위치 (말풍선 안 중앙 조금 위)
         text_x = msg_cx - len(msg) * 1 # 길이에 따라 살짝 왼쪽으로
@@ -1460,21 +1457,21 @@ def _draw_menu_bounds():
     if menu_rect_main is None:
         return
 
-    # 전체 메뉴 영역
-    draw_rectangle(*menu_rect_main)
+    # # 전체 메뉴 영역
+    # # draw_rectangle(*menu_rect_main)
+    #
+    # # X 버튼
+    # if menu_rect_close:
+    #     draw_rectangle(*menu_rect_close)
+    #
+    # # 캐릭터 / 인벤 / 단축키 / 무기강화
+    # for rect in [menu_rect_char, menu_rect_inven, menu_rect_hotkey, menu_rect_weapon]:
+    #     if rect:
+    #         draw_rectangle(*rect)
 
-    # X 버튼
-    if menu_rect_close:
-        draw_rectangle(*menu_rect_close)
-
-    # 캐릭터 / 인벤 / 단축키 / 무기강화
-    for rect in [menu_rect_char, menu_rect_inven, menu_rect_hotkey, menu_rect_weapon]:
-        if rect:
-            draw_rectangle(*rect)
-
-    # 게임 종료 버튼
-    if menu_rect_exit:
-        draw_rectangle(*rect)
+    # # 게임 종료 버튼
+    # if menu_rect_exit:
+    #     draw_rectangle(*rect)
 
 
 def _handle_subwindow_mouse(event):
@@ -1701,10 +1698,10 @@ def _draw_quest_window():
         decline_cy + btn_h // 2
     )
 
-    # ----- 디버그: 버튼 충돌 영역 빨간 네모 -----
-    if DRAW_MENU_BOUNDS:
-        draw_rectangle(*quest_accept_rect)
-        draw_rectangle(*quest_decline_rect)
+    # # ----- 디버그: 버튼 충돌 영역 빨간 네모 -----
+    # if DRAW_MENU_BOUNDS:
+    #     draw_rectangle(*quest_accept_rect)
+    #     draw_rectangle(*quest_decline_rect)
 
 
 def _handle_quest_mouse(event):
@@ -1770,7 +1767,7 @@ def _draw_quest_tracker():
     y0 = y1 - h
 
     # 배경 박스 (원하면 나중에 이미지로 교체)
-    draw_rectangle(x0, y0, x1, y1)
+    # draw_rectangle(x0, y0, x1, y1)
 
     # 진행도: 인벤토리에서 주황버섯의 갓 개수 가져오기
     count = boy.inventory.get('주황버섯의 갓', 0)

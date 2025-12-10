@@ -393,7 +393,7 @@ class Attack:
         rx = sx + half_w  # right
         tx = y + half_h  # top
 
-        draw_rectangle(lx, bx, rx, tx)
+        # draw_rectangle(lx, bx, rx, tx)
 
 class Die:
     FPS = 6.0
@@ -1022,7 +1022,7 @@ class Boy:
             return
 
         self.inventory['빨간포션'] -= 1
-        self.hp = min(self.max_hp, self.hp + 10)  # 20 회복
+        self.hp = min(self.max_hp, self.hp + 20)  # 20 회복
         print("빨간포션 사용, hp =", self.hp, "/", self.max_hp)
 
     def use_blue_potion(self):

@@ -83,7 +83,7 @@ class MingMing:
         r = self.TALK_RADIUS
         box_bottom = sy -50
         box_top    = sy + 50  # 필요하면 높이 조절
-        draw_rectangle(sx - r, box_bottom, sx + r, box_top)
+        # draw_rectangle(sx - r, box_bottom, sx + r, box_top)
 
     # --- 플레이어와 근접 여부 ---
     def is_near(self, boy, radius=80):
