@@ -9,6 +9,8 @@ from field import Field
 from monster import Mushroom, Axe
 from item import DropItem, ITEM_IMAGES
 from npc import MingMing
+from hit_effect import HitEffect
+import sound
 
 field = None
 boy = None
@@ -35,6 +37,8 @@ quest_accept_rect = None
 quest_decline_rect = None
 current_npc = None
 
+portal_img = None
+PORTAL_SCALE = 0.2
 
 
 # ==== ESC 메뉴 상태 ====
@@ -102,13 +106,13 @@ potion_icon_imgs = {}
 #-----------------------------
 
 DROP_TABLE_MUSHROOM = [
-    ('10원',   0.25),
-    ('100원', 0.2),
-    ('1000원',    0.1),
-    ('5000원',    0.05),
-    ('주황버섯의 갓',   0.2),
-    ('빨간포션', 0.1),
-    ('파란포션', 0.1),
+    ('10원',   0.1),
+    # ('100원', 0.2),
+    # ('1000원',    0.1),
+    # ('5000원',    0.05),
+    ('주황버섯의 갓',   0.9),
+    # ('빨간포션', 0.1),
+    # ('파란포션', 0.1),
 ]
 
 DROP_TABLE_AXE = [
@@ -278,8 +282,14 @@ def init():
     global potion_bar_img, potion_icons
     global  game_over_img
     global quest_panel_img
+    global portal_img
+
+    sound.init()
+
+    sound.play_bgm('henesys')
 
     load_map("henesys", "default")
+
 
     menu_open = False
 
@@ -302,6 +312,8 @@ def init():
     potion_icon_imgs = {}
 
     game_over_img = load_image('사진수집/etc/부활키.png')
+
+    portal_img = load_image('사진수집/etc/portal.png')
 
     _init_menu_layout()
 
@@ -376,6 +388,13 @@ def load_map(name: str, entry: str = "default"):
 
     data = MAPS[name]
     current_map = name
+
+    if name == "henesys":
+        sound.play_bgm('henesys')
+    elif name == "map2":
+        sound.play_bgm('map2')
+    elif name == "map3":
+        sound.play_bgm('map3')
 
     # 1) 기존 Boy 제거
     for layer in game_world.world:  # world = [[],[],[]]
@@ -554,17 +573,59 @@ def _check_portal_transition(dt):
         x0, y0, x1, y1 = p["rect"]
         need_up = p.get("require_up", False)
         if _overlap(bb, (x0, y0, x1, y1)) and (not need_up or getattr(boy, "up_pressed", False)):
-            # print("PORTAL TRIGGER:", current_map, "->", p["to"])
+            sound.play_sfx('portal')
+
             load_map(p["to"], entry=p.get("entry", "default"))
             _transition_cooldown = 0.25
             return
 
-def _draw_portals_debug():
-    for p in MAPS[current_map].get("portals", []):
+def _draw_portals():
+    global portal_img
+
+    if field is None:
+        return
+
+    portals = MAPS[current_map].get("portals", [])
+    if not portals:
+        return
+
+    for p in portals:
         x0, y0, x1, y1 = p["rect"]
-        sx0, sy0 = field.world_to_screen(x0, y0)
-        sx1, sy1 = field.world_to_screen(x1, y1)
-        draw_rectangle(min(sx0, sx1), min(sy0, sy1), max(sx0, sx1), max(sy0, sy1))
+
+        # 포탈 사각형의 가운데, 바닥 y
+        cx = (x0 + x1) / 2
+        bottom_y = y0
+
+        # 월드→스크린 좌표
+        sx, sy = field.world_to_screen(cx, bottom_y)
+
+        # ==== 포탈 스프라이트 그리기 ====
+        if portal_img:
+            # 그릴 크기
+            DW = int(portal_img.w * PORTAL_SCALE)
+            DH = int(portal_img.h * PORTAL_SCALE)
+
+            # 화면 기준 왼쪽/오른쪽 판단 (맵 가운데 기준)
+            # cx가 맵의 절반보다 작으면 "왼쪽 포탈" -> 좌우 반전
+            world_mid = getattr(field, "bg_w", 1000) / 2
+            flip = 'h' if cx < world_mid else ''
+
+            # sy는 바닥이니까, 포탈이 땅 위에 서 있게 절반 만큼 올리기
+            portal_img.clip_composite_draw(
+                0, 0, portal_img.w, portal_img.h,
+                0, flip,
+                sx, sy + DH // 2,  # 화면 위치
+                DW, DH
+            )
+
+        # ==== 디버그용 충돌 박스 (원하면 끄기) ====
+        if DRAW_HITBOX:
+            sx0, sy0 = field.world_to_screen(x0, y0)
+            sx1, sy1 = field.world_to_screen(x1, y1)
+            draw_rectangle(min(sx0, sx1), min(sy0, sy1),
+                           max(sx0, sx1), max(sy0, sy1))
+
+
 
 def handle_events():
     global menu_open
@@ -590,15 +651,15 @@ def handle_events():
                 print("[UI] 메뉴 토글 =", menu_open)
             continue
 
-        # =======================
-        # U / I / O / P 단축키
-        # =======================
+
+
         if event.type == SDL_KEYDOWN:
             # 캐릭터 정보 (U)
             if event.key == SDLK_u:
                 ui_char_open = True
                 ui_inven_open = ui_hotkey_open = ui_weapon_open = ui_quest_open = False
                 menu_open = False
+                sound.play_ui_click()
                 print("[GLOBAL] 캐릭터 정보 (U)")
                 continue
 
@@ -607,6 +668,7 @@ def handle_events():
                 ui_inven_open = True
                 ui_char_open = ui_hotkey_open = ui_weapon_open = ui_quest_open = False
                 menu_open = False
+                sound.play_ui_click()
                 print("[GLOBAL] 인벤토리 (I)")
                 continue
 
@@ -615,6 +677,7 @@ def handle_events():
                 ui_hotkey_open = True
                 ui_char_open = ui_inven_open = ui_weapon_open = ui_quest_open = False
                 menu_open = False
+                sound.play_ui_click()
                 print("[GLOBAL] 단축키 정보 (O)")
                 continue
 
@@ -623,6 +686,7 @@ def handle_events():
                 ui_weapon_open = True
                 ui_char_open = ui_inven_open = ui_hotkey_open = ui_quest_open = False
                 menu_open = False
+                sound.play_ui_click()
                 print("[GLOBAL] 무기 강화 (P)")
                 continue
 
@@ -631,6 +695,7 @@ def handle_events():
         # =======================
         if ui_weapon_open and event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
             _attempt_weapon_enchant()
+            sound.play_ui_click()
             # boy.handle_event 로 넘기지 않음
             continue
 
@@ -709,7 +774,13 @@ def _handle_collisions():
                 m.take_hit(damage=dmg, from_dir=boy.face_dir)
                 m.hit_cool = 0.3
 
-    # 2) 플레이어 공격 → 몬스터 피격
+                # ==== 여기서 히트 이펙트 생성 ====
+                fx_x = m.x
+                fx_y = m.y -10  # 몬스터 머리쪽에 살짝 위로
+                fx = HitEffect(fx_x, fx_y, field)
+                game_world.add_object(fx, 2)
+
+                # 2) 플레이어 공격 → 몬스터 피격
     if getattr(boy, 'attack_active', False):
         atk_bb = boy.get_attack_bb()
         for m in _gather_monsters():
@@ -827,6 +898,9 @@ def update():
                 if o in items:
                     items.remove(o)
 
+            if isinstance(o, HitEffect) and getattr(o, 'dead', False):
+                game_world.remove_object(o)
+
     for task in list(respawn_tasks):
         task[0] -= dt   # 남은 시간 감소
         if task[0] <= 0:
@@ -858,7 +932,7 @@ def update():
 def draw():
     clear_canvas()
     game_world.render()
-    _draw_portals_debug()
+    _draw_portals()
 
 
     if hasattr(boy, 'alive') and not boy.alive:
@@ -940,6 +1014,7 @@ def _draw_menu():
     #             draw_rectangle(*rect)
 
 def _draw_subwindows():
+
     cw, ch = get_canvas_width(), get_canvas_height()
 
     _draw_char_window()
@@ -1399,7 +1474,8 @@ def _draw_menu_bounds():
 
     # 게임 종료 버튼
     if menu_rect_exit:
-        draw_rectangle(*menu_rect_exit)
+        draw_rectangle(*rect)
+
 
 def _handle_subwindow_mouse(event):
     global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open, ui_quest_open
@@ -1414,24 +1490,28 @@ def _handle_subwindow_mouse(event):
     # 캐릭터 정보창 X
     if ui_char_open and _in_rect(mx, my, char_x_rect):
         ui_char_open = False
+        sound.play_ui_click()
         print("[UI] 캐릭터창 X 클릭 → 닫기")
         return
 
     # 인벤창 X
     if ui_inven_open and _in_rect(mx, my, inven_x_rect):
         ui_inven_open = False
+        sound.play_ui_click()
         print("[UI] 인벤창 X 클릭 → 닫기")
         return
 
     # 단축키창 X
     if ui_hotkey_open and _in_rect(mx, my, hotkey_x_rect):
         ui_hotkey_open = False
+        sound.play_ui_click()
         print("[UI] 단축키창 X 클릭 → 닫기")
         return
 
     # 무기강화창 X
     if ui_weapon_open and _in_rect(mx, my, weapon_x_rect):
         ui_weapon_open = False
+        sound.play_ui_click()
         print("[UI] 무기강화창 X 클릭 → 닫기")
         return
 
@@ -1440,6 +1520,7 @@ def _handle_subwindow_mouse(event):
         if _in_rect(mx, my, quest_accept_rect):
             global mingming_quest_state
             ui_quest_open = False
+            sound.play_sfx('ui_click')
             if current_npc and isinstance(current_npc, MingMing):
                 # 퀘스트 시작
                 current_npc.quest_state = MingMing.QUEST_IN_PROGRESS
@@ -1451,6 +1532,7 @@ def _handle_subwindow_mouse(event):
         # 거절
         if _in_rect(mx, my, quest_decline_rect):
             ui_quest_open = False
+            sound.play_sfx('ui_click')
             # 거절해도 다시 말 걸면 또 수락할 수 있게 상태 유지
             print("[QUEST] 밍밍 퀘스트 거절")
             return
@@ -1726,6 +1808,8 @@ def _complete_mingming_quest():
 
     npc.quest_state = MingMing.QUEST_DONE
     boy.current_quest = None
+
+    sound.play_sfx('quest')
 
     print("[QUEST] 밍밍 퀘스트 완료! EXP 500, 빨간포션 10개, 골드 5000 획득!")
 

@@ -1,6 +1,7 @@
 from pico2d import *
 import game_framework
 import play_mode
+import sound
 
 image = None
 font = None
@@ -10,6 +11,8 @@ def init(): # 타이틀 이미지를 로드
 
     image = load_image('사진수집/메인 화면.jpg')
     font = load_font('ENCR10B.TTF', 30)
+
+    sound.play_bgm('title')
 
 def update(): #시간 체크
     pass

@@ -2,6 +2,7 @@ from pico2d import (load_image, get_time, load_font, SDL_KEYDOWN, SDLK_RIGHT, SD
                     SDLK_LEFT , SDLK_LCTRL, SDLK_UP, SDLK_z,SDLK_LALT, SDLK_1, SDLK_2, SDLK_SPACE, get_canvas_width, get_canvas_height, draw_rectangle)
 
 import game_framework
+import sound
 from state_machine import StateMachine
 
 
@@ -206,6 +207,8 @@ class Jump:
         self.acc = 0.0
         self.boy.in_air = True
 
+        sound.play_jump()
+
         if self.boy.dir != 0:
             self.hdir = self.boy.dir
         else:
@@ -295,6 +298,7 @@ class Attack:
         self.style = 0
         self.air_attack = False
         self.vy = 0.0
+
 
     def enter(self, e):
         self.t = 0.0
@@ -857,6 +861,8 @@ class Boy:
 
     def obtain_item(self, kind: str):
         # 돈 종류는 gold에 누적
+        sound.play_pickup()
+
         if kind == '10원':
             self.gold += 10
             return
@@ -891,11 +897,13 @@ class Boy:
 
         # 레벨업 했다면 이펙트 타이머 켜기
         if leveled_up:
-            self.levelup_timer = 1.0  # 1초 동안 표시 (원하면 0.7 같은 값으로 바꿔도 됨)
+            self.levelup_timer = 1.0
+            sound.play_sfx('levelup') # 1초 동안 표시 (원하면 0.7 같은 값으로 바꿔도 됨)
             print(f"[LEVEL] 레벨업! 지금 레벨 = {self.level}")
 
     def level_up(self):
         self.level += 1
+
         print(f"[PLAYER] LEVEL UP! Lv.{self.level}")
 
         self.max_hp += 10  # 레벨당 +20
@@ -1033,6 +1041,9 @@ class Boy:
             # 처음 버프 시작
             self.speed_buff_timer = BLUE_POTION_ADD_SEC
             self.speed_buff_mult = 1.5
+
+        self.speed_mul = 1.5
+        self.attack_speed_mul = 1.5
 
     def respawn(self):
         # 체력/상태 리셋

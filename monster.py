@@ -1,7 +1,7 @@
 from pico2d import *
 import random
 import game_framework
-
+import sound
 
 PIXEL_PER_METER = (10.0 / 0.3) # 10 pixel 30 cm
 RUN_SPEED_KMPH = 20.0 # Km / Hour
@@ -98,11 +98,13 @@ class Mushroom:
 
         dmg = max(1, int(damage))
         self.hp -= dmg
+        sound.play_sfx('hit')
         self.hit_dir = -from_dir  # 공격 반대 방향으로 넉백
 
         print(f"[MUSHROOM] hit! dmg={dmg}, hp -> {self.hp}")
 
         if self.hp <= 0:
+            sound.play_sfx('monster_die')
             self.state = 'die'
             self.state_t = 0.0
             self.frame = 0
@@ -312,14 +314,17 @@ class Axe:
         dmg = max(1, int(damage))
         self.hp -= dmg
         self.hit_dir = -from_dir
+        sound.play_sfx('hit')
 
         print(f"[AXE] hit! dmg={dmg}, hp -> {self.hp}")
 
         if self.hp <= 0:
+            sound.play_sfx('monster_die')
             self.state = 'die'
             self.state_t = 0.0
             self.frame = 0
             self.dead = False
+            sound.play_monster_die()
         else:
             self.state = 'hit'
             self.state_t = 0.0
