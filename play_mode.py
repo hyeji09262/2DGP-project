@@ -1306,7 +1306,7 @@ def _get_enchant_info():
     rate = max(0.20, rate)  # 최소 20%
 
     # 골드 소비: 현재 무기 레벨 * 100
-    cost = 10 * cur_level
+    cost = 1000 * cur_level
 
     atk_before = cur_atk
     atk_after = cur_atk + 5  # 한 번 성공 시 +5
