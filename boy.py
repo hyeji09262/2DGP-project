@@ -896,8 +896,15 @@ class Boy:
             leveled_up = True
 
         # 레벨업 했다면 이펙트 타이머 켜기
-        if leveled_up:
+        if leveled_up > 0:
+            # 레벨업 횟수만큼 최대 HP 증가
+            self.max_hp += 10 * leveled_up  # 한 레벨당 10씩
+            self.hp = self.max_hp  # 풀피로 회복
+
+            # 레벨업 이펙트 (이미 쓰던 거)
             self.levelup_timer = 1.0
+            self.levelup_timer = 1.0
+
             sound.play_sfx('levelup') # 1초 동안 표시 (원하면 0.7 같은 값으로 바꿔도 됨)
             print(f"[LEVEL] 레벨업! 지금 레벨 = {self.level}")
 
