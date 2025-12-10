@@ -27,7 +27,7 @@ npcs = []
 
 ui_quest_open = False
 quest_panel_img = None
-QUEST_PANEL_SCALE = 0.6
+QUEST_PANEL_SCALE = 0.4
 
 quest_accept_rect = None
 quest_decline_rect = None
@@ -430,8 +430,7 @@ def load_map(name: str, entry: str = "default"):
 
     # 8) 첫 번째 맵(henesys)에만 NPC 배치
     if name == "henesys":
-        # 👉 여기서 위치 (800, 400) 고정
-        npc_x, npc_y = 800, field.ground_y(400)
+        npc_x, npc_y = 800, field.ground_y(800)
         npc = MingMing(npc_x, npc_y, field)
         game_world.add_object(npc, 1)
         npcs.append(npc)
@@ -564,6 +563,7 @@ def _draw_portals_debug():
 def handle_events():
     global menu_open
     global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open, ui_quest_open
+    global current_npc, npc
 
     event_list = get_events()
     for event in event_list:
@@ -601,18 +601,21 @@ def handle_events():
 
         if ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open or ui_quest_open:
             _handle_subwindow_mouse(event)
-            if ui_quest_open:
-                _handle_quest_mouse(event)
-            # 서브창/퀘스트창 열려 있으면 캐릭터 조작 막기
             continue
 
-        if (not menu_open) and (not (ui_char_open or ui_inven_open or ui_hotkey_open or ui_weapon_open)):
-            # NPC 대화 (스페이스)
-            if event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
-                if npc and npc.is_near(boy):
-                    ui_quest_open = True  # 퀘스트 창 열기
-                    print("[NPC] 퀘스트 대화 열기")
-                    continue
+            # ====== NPC 상호작용 (스페이스) ======
+        if event.type == SDL_KEYDOWN and event.key == SDLK_SPACE:
+            if npc and npc.can_talk(boy):
+                # 밍밍 퀘스트 상태에 따라 다르게
+                if npc.quest_state == MingMing.QUEST_AVAILABLE:
+                    # 퀘스트 설명창 열기
+                    ui_quest_open = True
+                    current_npc = npc
+                elif npc.quest_state == MingMing.QUEST_READY:
+                    # 퀘스트 완료 & 보상 지급
+                    _complete_mingming_quest()
+                # 진행중일 때는 can_talk() 에서 False라서 여기까지 안 옴
+                continue
 
             # ====== 평소 게임 조작(캐릭터 이동/점프/공격 등) ======
         boy.handle_event(event)
@@ -713,6 +716,7 @@ def update():
     _keep_boy_in_world()
     _handle_collisions()
     _handle_item_pickup()
+    _update_mingming_quest()
 
     if last_enchant_timer > 0:
         last_enchant_timer -= dt
@@ -736,7 +740,7 @@ def update():
                 boy.gain_exp(10)
 
                 # 3초 후 다시 소환 예약 (현재 맵에서만)
-                respawn_tasks.append([3.0, 'mushroom', o.x])
+                respawn_tasks.append([5.0, 'mushroom', o.x])
 
                 game_world.remove_object(o)
                 if o in monsters:
@@ -755,7 +759,7 @@ def update():
 
                 # Axe는 5초 후 다시 소환하되, 필드3(예: "map3")에서만
                 if current_map == "map3":
-                    respawn_tasks.append([3.0, 'axe', o.x])
+                    respawn_tasks.append([5.0, 'axe', o.x])
 
                 game_world.remove_object(o)
                 if o in monsters:
@@ -1340,6 +1344,7 @@ def _draw_menu_bounds():
 def _handle_subwindow_mouse(event):
     global ui_char_open, ui_inven_open, ui_hotkey_open, ui_weapon_open, ui_quest_open
     global char_x_rect, inven_x_rect, hotkey_x_rect, weapon_x_rect
+    global quest_accept_rect, quest_decline_rect
 
     if event.type != SDL_MOUSEBUTTONDOWN or event.button != SDL_BUTTON_LEFT:
         return
@@ -1369,6 +1374,24 @@ def _handle_subwindow_mouse(event):
         ui_weapon_open = False
         print("[UI] 무기강화창 X 클릭 → 닫기")
         return
+
+    if ui_quest_open:
+        # 수락
+        if _in_rect(mx, my, quest_accept_rect):
+            ui_quest_open = False
+            if current_npc and isinstance(current_npc, MingMing):
+                # 퀘스트 시작
+                current_npc.quest_state = MingMing.QUEST_IN_PROGRESS
+                boy.current_quest = '밍밍_주황버섯20'
+                print("[QUEST] 밍밍 퀘스트 수락! 주황버섯의 갓 20개 모아오기.")
+            return
+
+        # 거절
+        if _in_rect(mx, my, quest_decline_rect):
+            ui_quest_open = False
+            # 거절해도 다시 말 걸면 또 수락할 수 있게 상태 유지
+            print("[QUEST] 밍밍 퀘스트 거절")
+            return
 
 def _get_potion_icon(kind):
     if kind not in potion_icons:
@@ -1494,40 +1517,51 @@ def _update_respawns(dt):
 def _draw_quest_window():
     global quest_accept_rect, quest_decline_rect
 
-    if not ui_quest_open:
-        return
-    if quest_panel_img is None:
+    if not ui_quest_open or quest_panel_img is None:
         return
 
     cw, ch = get_canvas_width(), get_canvas_height()
 
+    # 퀘스트 패널 크기 (축소)
     w = int(quest_panel_img.w * QUEST_PANEL_SCALE)
     h = int(quest_panel_img.h * QUEST_PANEL_SCALE)
-    cx, cy = cw // 2, ch // 2
 
+    cx, cy = cw // 2, ch // 2
     panel_left   = cx - w // 2
     panel_bottom = cy - h // 2
 
+    # 퀘스트 이미지 그리기
     quest_panel_img.draw(cx, cy, w, h)
 
-    # 버튼 위치는 이미지 비율로 대충 설정 (필요하면 나중에 숫자 조금씩 조정)
-    # 수락 버튼 (왼쪽 아래 쪽)
-    acc_x0 = panel_left + int(w * 0.25)
-    acc_x1 = panel_left + int(w * 0.45)
-    acc_y0 = panel_bottom + int(h * 0.18)
-    acc_y1 = panel_bottom + int(h * 0.30)
-    quest_accept_rect = (acc_x0, acc_y0, acc_x1, acc_y1)
+    # ----- 수락 / 거절 버튼 위치 -----
+    btn_w = int(w * 0.12)
+    btn_h = int(h * 0.1)
 
-    # 거절 버튼 (오른쪽 아래 쪽)
-    dec_x0 = panel_left + int(w * 0.55)
-    dec_x1 = panel_left + int(w * 0.75)
-    dec_y0 = acc_y0
-    dec_y1 = acc_y1
-    quest_decline_rect = (dec_x0, dec_y0, dec_x1, dec_y1)
+    # 수락 버튼 (왼쪽 아래)
+    accept_cx = panel_left + int(w * 0.57)
+    accept_cy = panel_bottom + int(h * 0.30)
+    quest_accept_rect = (
+        accept_cx - btn_w // 2,
+        accept_cy - btn_h // 2,
+        accept_cx + btn_w // 2,
+        accept_cy + btn_h // 2
+    )
 
-    # 디버그: 버튼 박스 보기
-    # draw_rectangle(*quest_accept_rect)
-    # draw_rectangle(*quest_decline_rect)
+    # 거절 버튼 (오른쪽 아래)
+    decline_cx = panel_left + int(w * 0.73)
+    decline_cy = accept_cy
+    quest_decline_rect = (
+        decline_cx - btn_w // 2,
+        decline_cy - btn_h // 2,
+        decline_cx + btn_w // 2,
+        decline_cy + btn_h // 2
+    )
+
+    # ----- 디버그: 버튼 충돌 영역 빨간 네모 -----
+    if DRAW_MENU_BOUNDS:
+        draw_rectangle(*quest_accept_rect)
+        draw_rectangle(*quest_decline_rect)
+
 
 def _handle_quest_mouse(event):
     global ui_quest_open
@@ -1554,7 +1588,46 @@ def _handle_quest_mouse(event):
         ui_quest_open = False
         return
 
+def _update_mingming_quest():
+    # 밍밍 퀘스트: 주황버섯의 갓 20개
+    global npc
+    if not npc or not isinstance(npc, MingMing):
+        return
 
+    # 진행중일 때만 체크
+    if npc.quest_state != MingMing.QUEST_IN_PROGRESS:
+        return
+
+    count = boy.inventory.get('주황버섯의 갓', 0)
+    if count >= 20:
+        npc.quest_state = MingMing.QUEST_READY
+        print("[QUEST] 밍밍 퀘스트 완료 가능 상태!")
+
+def _complete_mingming_quest():
+    global npc
+    if not npc or not isinstance(npc, MingMing):
+        return
+    if npc.quest_state != MingMing.QUEST_READY:
+        return
+
+    have = boy.inventory.get('주황버섯의 갓', 0)
+    if have < 20:
+        # 혹시 인벤에서 버렸다면 다시 진행중으로 돌릴 수도 있음
+        print("[QUEST] 재료가 모자랍니다.")
+        return
+
+    # 재료 20개 소비
+    boy.inventory['주황버섯의 갓'] = have - 20
+
+    # 보상 지급
+    boy.gain_exp(500)
+    boy.inventory['빨간포션'] = boy.inventory.get('빨간포션', 0) + 10
+    boy.gold += 5000
+
+    npc.quest_state = MingMing.QUEST_DONE
+    boy.current_quest = None
+
+    print("[QUEST] 밍밍 퀘스트 완료! EXP 500, 빨간포션 10개, 골드 5000 획득!")
 
 
 

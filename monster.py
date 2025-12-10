@@ -282,8 +282,8 @@ class Axe:
 
         # 체력/상태 (버섯보다 쎄게)
         self.state = 'run'
-        self.hp = 30
-        self.max_hp = 3
+        self.hp = 80
+        self.max_hp = 80
         self.dead = False
 
         self.hit_dir = 0
