@@ -894,7 +894,7 @@ def draw():
     _draw_quest_window()
 
     _draw_quest_tracker()
-
+    _draw_esc_hint()
     update_canvas()
 
 def _draw_round_panel(rect):
@@ -1716,6 +1716,27 @@ def _complete_mingming_quest():
 
     print("[QUEST] 밍밍 퀘스트 완료! EXP 500, 빨간포션 10개, 골드 5000 획득!")
 
+def _draw_esc_hint():
+    if boy is None:
+        return
+
+    cw, ch = get_canvas_width(), get_canvas_height()
+    text = "메뉴 [ESC]"
+
+    # 이미 boy에 한글 폰트 있으니까 그거 재사용
+    font = boy.kr_font   # 또는 boy.ui_font / boy.font 아무거나
+
+    # 오른쪽 아래 정렬 느낌으로 위치 계산
+    margin_x = 15
+    margin_y = 15
+
+    # 글자 길이에 따라 살짝 왼쪽으로
+    x = cw - margin_x - len(text) * 10
+    y = margin_y
+
+    # 테두리(검정) + 본문(흰색) 두 번 그리기
+    font.draw(x + 1, y - 1, text, (0, 0, 0))
+    font.draw(x,     y,     text, (255, 255,255))
 
 
 
