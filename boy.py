@@ -498,6 +498,9 @@ class Boy:
         self.exp = 0
         self.exp_to_next = 100
 
+        self.levelup_img = load_image('사진수집/etc/levelup.png')
+        self.levelup_timer = 0.0
+
         self.alive = True
         self.dead_anim_t = 0.0
         self.dead_anim_duration = 1.0
@@ -642,6 +645,11 @@ class Boy:
 
     def update(self):
         dt = game_framework.frame_time
+
+        if self.levelup_timer > 0:
+            self.levelup_timer -= dt
+            if self.levelup_timer < 0:
+                self.levelup_timer = 0
 
         if not self.alive:
             self.dead_anim_t += dt
@@ -865,20 +873,28 @@ class Boy:
             # 그 외는 인벤토리 아이템
         self.inventory[kind] = self.inventory.get(kind, 0) + 1
 
-    def gain_exp(self, amount: int):
-        """경험치 획득"""
-        if not getattr(self, 'alive', True):
-            return
-
+    def gain_exp(self, amount):
+        # 경험치 추가
         self.exp += amount
-        print(f"[PLAYER] GET EXP {amount}, now {self.exp}/{self.exp_to_next}")
 
+        leveled_up = False
+
+        # 여러 레벨 한 번에 오를 수도 있으니까 while
         while self.exp >= self.exp_to_next:
             self.exp -= self.exp_to_next
-            self.level_up()
+            self.level += 1
+
+            # 다음 레벨 요구 경험치 (적당히 조정 가능)
+            self.exp_to_next = int(self.exp_to_next * 1.3)
+
+            leveled_up = True
+
+        # 레벨업 했다면 이펙트 타이머 켜기
+        if leveled_up:
+            self.levelup_timer = 1.0  # 1초 동안 표시 (원하면 0.7 같은 값으로 바꿔도 됨)
+            print(f"[LEVEL] 레벨업! 지금 레벨 = {self.level}")
 
     def level_up(self):
-        """레벨업 시 체력, 필요 경험치 증가"""
         self.level += 1
         print(f"[PLAYER] LEVEL UP! Lv.{self.level}")
 
@@ -979,6 +995,17 @@ class Boy:
             # 테두리처럼 두 번 그리기
             self.ui_font.draw(time_x - 1, time_y - 1, f"{remain}s", (0, 0, 0))
             self.ui_font.draw(time_x, time_y, f"{remain}s", (0, 200, 255))
+
+        if  self.levelup_timer > 0 and self.levelup_img:
+            cw = get_canvas_width()
+            ch = get_canvas_height()
+
+            scale = 0.3  # 크기 마음대로 조정
+            w = int(self.levelup_img.w * scale)
+            h = int(self.levelup_img.h * scale)
+
+            # 화면 중앙 약간 위쪽에 띄우기
+            self.levelup_img.draw(cw // 2, ch // 2 + 80, w, h)
 
     def use_red_potion(self):
         # 인벤에 빨간포션 없으면 취소
